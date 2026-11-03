@@ -29,6 +29,7 @@ function formatPauseTime(sec) {
 }
 
 function getMonday(dStr) {
+  if (!dStr) return '';
   const p = dStr.split('-');
   const d = new Date(p[0], p[1] - 1, p[2]);
   const day = d.getDay();
@@ -37,6 +38,7 @@ function getMonday(dStr) {
 }
 
 function getDayNameFr(dateStr) {
+  if (!dateStr) return '';
   const parts = dateStr.split('-');
   const d = new Date(parts[0], parts[1] - 1, parts[2]);
   const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -85,6 +87,7 @@ function render() {
   // Regroupement par semaine du lundi
   const weeks = {};
   logs.forEach(l => {
+    if (!l.date) return;
     const m = getMonday(l.date);
     if (!weeks[m]) weeks[m] = [];
     weeks[m].push(l);
@@ -99,7 +102,7 @@ function render() {
     const daysCounted = new Set();
 
     weeks[monday].forEach(l => {
-      const worked = (l.actualNetSeconds || 0);
+      const worked = (l.actualNetSeconds ?? l.workedSec ?? 0);
       weekWork += worked;
 
       if (!daysCounted.has(l.date)) {
@@ -112,43 +115,43 @@ function render() {
     totalBankSec += delta;
 
     if (logsContainer) {
-    // Calcul du numéro de semaine ISO
-    const weekHeader = document.createElement('div');
-    weekHeader.className = 'results-week-title';
-    weekHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 4px 10px; margin-top: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);';
+      // Titre de la semaine
+      const weekHeader = document.createElement('div');
+      weekHeader.className = 'results-week-title';
+      weekHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 4px 10px; margin-top: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);';
 
-    // Formatage de la date du lundi
-    const [my, mm, md] = monday.split('-').map(Number);
-    const monthsFull = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    const monthName = monthsFull[mm - 1];
+      // Formatage de la date du lundi
+      const [my, mm, md] = monday.split('-').map(Number);
+      const monthsFull = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      const monthName = monthsFull[mm - 1] || '';
 
-    // Calculs décimaux de la semaine
-    const wHours = (weekWork / 3600).toFixed(2);
-    const targetHours = (weekTarget / 3600).toFixed(2);
-    const dHours = (delta >= 0 ? '+' : '-') + (Math.abs(delta) / 3600).toFixed(2);
-    const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
+      // Calculs décimaux de la semaine
+      const wHours = (weekWork / 3600).toFixed(2);
+      const targetHours = (weekTarget / 3600).toFixed(2);
+      const dHours = (delta >= 0 ? '+' : '-') + (Math.abs(delta) / 3600).toFixed(2);
+      const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
 
-    weekHeader.innerHTML = `
-      <div style="font-weight: 800; font-size: 0.95rem; color: #ffffff; line-height: 1.25;">
-        Semaine Du Lundi ${md}<br>${monthName}
-      </div>
-      <div style="text-align: right; line-height: 1.3;">
-        <div style="font-weight: 800; font-size: 0.92rem; color: ${deltaColor};">
-          ${wHours}h / Cible : ${targetHours}h
+      weekHeader.innerHTML = `
+        <div style="font-weight: 800; font-size: 0.95rem; color: #ffffff; line-height: 1.25;">
+          Semaine Du Lundi ${md}<br>${monthName}
         </div>
-        <div style="font-weight: 800; font-size: 0.88rem; color: ${deltaColor};">
-          (${dHours}h)
+        <div style="text-align: right; line-height: 1.3;">
+          <div style="font-weight: 800; font-size: 0.92rem; color: ${deltaColor};">
+            ${wHours}h / Cible : ${targetHours}h
+          </div>
+          <div style="font-weight: 800; font-size: 0.88rem; color: ${deltaColor};">
+            (${dHours}h)
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    logsContainer.appendChild(weekHeader);
+      logsContainer.appendChild(weekHeader);
 
       // Tri des jours de la semaine du plus récent au plus ancien
-      weeks[monday].sort((a, b) => b.date.localeCompare(a.date));
+      weeks[monday].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
       weeks[monday].forEach(l => {
-        const netSec = (l.actualNetSeconds || 0);
+        const netSec = (l.actualNetSeconds ?? l.workedSec ?? 0);
         const card = document.createElement('div');
         card.className = 'result-card';
         card.style.cssText = 'background: #0d131f; border: 1px solid #1c2738; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;';
@@ -164,10 +167,10 @@ function render() {
         const dayName = getDayNameFr(l.date);
 
         // Date abrégée : "30 Oct."
-        const [y, m, d] = l.date.split('-').map(Number);
+        const [y, m, d] = (l.date || '').split('-').map(Number);
         const monthsShort = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
-        const dateShortStr = `${d} ${monthsShort[m - 1]}`;
-        const pauseLabel = formatPauseTime(l.pauseSeconds);
+        const dateShortStr = `${d} ${monthsShort[m - 1] || ''}`;
+        const pauseLabel = formatPauseTime(l.pauseSeconds ?? l.totalPause ?? 0);
 
         const targetSec = getPrescribedDaySeconds(l.date);
         const diffSec = netSec - targetSec;
@@ -181,23 +184,26 @@ function render() {
         const balanceText = `${balanceSign}${bH}h ${String(bM).padStart(2, '0')}m`;
         const balanceColor = diffMin >= 0 ? 'var(--green)' : 'var(--red)';
 
+        const displayIn = l.in || l.timeIn || '--:--';
+        const displayOut = l.out || l.timeOut || '--:--';
+
         card.innerHTML = `
           <!-- Bloc de Gauche -->
           <div style="display: flex; flex-direction: column; gap: 3px;">
             <div style="font-weight: 800; font-size: 1.05rem; color: #ffffff;">${dayName}</div>
             <div style="font-size: 0.80rem; color: #7f93aa; font-weight: 500;">
-              ${dateShortStr} • ${l.in} ➔ ${l.out}
+              ${dateShortStr} &bull; ${displayIn} ➔ ${displayOut}
             </div>
             <div style="font-size: 0.75rem; color: #7f93aa;">
               Pause : ${pauseLabel}
             </div>
           </div>
 
-          <!-- Bloc de Droite (Heures, Cible, Solde sans badge) -->
+          <!-- Bloc de Droite (Heures, Cible, Solde) -->
           <div style="display: flex; align-items: center; gap: 10px;">
             <div style="text-align: right; display: flex; flex-direction: column; gap: 3px;">
               <div style="font-weight: 800; font-size: 0.98rem; color: #38bdf8; letter-spacing: -0.01em;">
-                ${l.in} - ${l.out}
+                ${(netSec / 3600).toFixed(2)}h
               </div>
               <div style="font-size: 0.78rem; color: #7f93aa; font-weight: 500;">
                 Cible : ${(targetSec / 3600).toFixed(2)}h
@@ -274,9 +280,9 @@ function editLog(id) {
 
   if (editId) editId.value = String(l.id);
   if (manDate) manDate.value = l.date;
-  if (manIn) manIn.value = l.in;
-  if (manOut) manOut.value = l.out;
-  if (manPause) manPause.value = formatPauseTime(l.pauseSeconds);
+  if (manIn) manIn.value = l.in || l.timeIn || '';
+  if (manOut) manOut.value = l.out || l.timeOut || '';
+  if (manPause) manPause.value = formatPauseTime(l.pauseSeconds ?? l.totalPause ?? 0);
 
   if (manHeader) manHeader.textContent = "Modification du quart";
   if (submitBtn) {
@@ -295,6 +301,11 @@ function delLog(id) {
   let logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
   logs = logs.filter(x => Number(x.id) !== Number(id));
   localStorage.setItem('shift_tracker_logs', JSON.stringify(logs));
+
+  // Suppression Cloud Firestore si l'utilisateur est connecté
+  if (typeof window.deleteShiftFromCloud === 'function') {
+    window.deleteShiftFromCloud(id);
+  }
 
   if (typeof cancelEditMode === 'function') cancelEditMode();
   render();
@@ -335,7 +346,7 @@ function importCSV(event) {
 
       let logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
 
-      const replaceAll = confirm("Voulez-vous remplacer TOUT l'historique actuel par celui du fichier CSV ?\n\n• OK = Remplacement complet (recommandé)\n• Annuler = Fusionner les quarts");
+      const replaceAll = confirm("Voulez-vous remplacer TOUT l'historique actuel par celui du fichier CSV ?\n\nOK = Remplacement complet (recommandé)\nAnnuler = Fusionner les quarts");
 
       if (replaceAll) {
         logs = [];
@@ -368,9 +379,13 @@ function importCSV(event) {
             id: Date.now() + i,
             date: shiftDate,
             in: shiftIn,
+            timeIn: shiftIn,
             out: shiftOut,
+            timeOut: shiftOut,
             pauseSeconds: pauseSec,
-            actualNetSeconds: netSec
+            totalPause: pauseSec,
+            actualNetSeconds: netSec,
+            workedSec: netSec
           };
 
           if (existingIndex !== -1) {
@@ -380,6 +395,11 @@ function importCSV(event) {
             logs.push(shiftObj);
             importedCount++;
           }
+
+          // Envoi au Cloud si connecté
+          if (typeof window.saveShiftToCloud === 'function') {
+            window.saveShiftToCloud(shiftObj);
+          }
         }
       }
 
@@ -388,7 +408,7 @@ function importCSV(event) {
 
       render();
 
-      alert(`Importation réussie !\n• ${importedCount} quart(s) ajouté(s)\n• ${updatedCount} quart(s) mis à jour\n\nSolde exact recalculé.`);
+      alert(`Importation réussie !\n${importedCount} quart(s) ajouté(s)\n${updatedCount} quart(s) mis à jour\n\nSolde exact recalculé.`);
       event.target.value = '';
 
     } catch (err) {
@@ -412,9 +432,11 @@ function exportCSV() {
 
   let csvContent = "Date,Arrivee,Depart,Pause,Net_Heures\n";
   logs.forEach(l => {
-    const netH = ((l.actualNetSeconds || 0) / 3600).toFixed(2);
-    const pauseStr = formatPauseTime(l.pauseSeconds);
-    csvContent += `${l.date},${l.in},${l.out},"${pauseStr}",${netH}\n`;
+    const netH = (((l.actualNetSeconds ?? l.workedSec ?? 0)) / 3600).toFixed(2);
+    const pauseStr = formatPauseTime(l.pauseSeconds ?? l.totalPause ?? 0);
+    const displayIn = l.in || l.timeIn || '';
+    const displayOut = l.out || l.timeOut || '';
+    csvContent += `${l.date},${displayIn},${displayOut},"${pauseStr}",${netH}\n`;
   });
 
   const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
