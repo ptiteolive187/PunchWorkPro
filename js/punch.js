@@ -344,17 +344,23 @@ function finishWorkDay() {
   const outStr = getNowTimeStr();
   const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
 
-  logs.push({
+  const newShift = {
     id: Date.now(),
     date: st.date,
     in: st.timeIn,
     out: outStr,
     pauseSeconds: totalPause,
     actualNetSeconds: totalWork
-  });
+  };
 
+  logs.push(newShift);
   logs.sort((a, b) => b.date.localeCompare(a.date));
   localStorage.setItem('shift_tracker_logs', JSON.stringify(logs));
+
+  // Sauvegarde dans Firebase Firestore si l'utilisateur est connecté
+  if (typeof window.saveShiftToCloud === 'function') {
+    window.saveShiftToCloud(newShift);
+  }
 
   setPunch(null);
   refreshPunchUI();
