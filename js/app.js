@@ -85,7 +85,7 @@ function switchTab(tabName, clickedBtn) {
 }
 window.switchTab = switchTab;
 
-// --- GESTION DE LA CONFIGURATION ---
+// --- GESTION DE LA VISIBILITÉ ---
 function updateVisibility() {
   const showSched = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
   const showHist = document.getElementById('cfgShowHistory')?.checked ?? true;
@@ -174,7 +174,7 @@ function saveConfiguration() {
 }
 window.saveConfiguration = saveConfiguration;
 
-// --- GESTION DU FORMULAIRE MANUEL ---
+// --- RÉINITIALISATION DU FORMULAIRE MANUEL ---
 function resetManualToDefaults() {
   const cfg = window.config || {};
   const dIn = cfg.defaultIn || "08:30";
@@ -193,6 +193,7 @@ function resetManualToDefaults() {
 }
 window.resetManualToDefaults = resetManualToDefaults;
 
+// --- SOUMISSION MANUELLE D'UN QUART ---
 function handleManualSubmit(e) {
   if (e && typeof e.preventDefault === 'function') {
     e.preventDefault();
@@ -227,6 +228,7 @@ function handleManualSubmit(e) {
 
   const actualNet = Math.max(0, grossSec - pauseSec);
 
+  // Objet quart avec l'intégralité des clés requises
   const newShift = {
     id: Date.now(),
     date: dateVal,
@@ -245,33 +247,35 @@ function handleManualSubmit(e) {
   currentLogs.push(newShift);
   currentLogs.sort((a, b) => b.date.localeCompare(a.date));
 
-  // Sauvegarde locale
+  // 1. Sauvegarde locale
   localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
 
-  // Sauvegarde Cloud (Firestore)
+  // 2. Sauvegarde Cloud (Firestore) si la session est active
   if (typeof window.saveShiftToCloud === 'function') {
     window.saveShiftToCloud(newShift);
   }
 
+  // 3. Rafraîchissement complet des interfaces
   if (typeof renderResults === 'function') renderResults();
   if (typeof render === 'function') render();
   if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
-  resetManualToDefaults();
+  if (typeof refreshPunchUI === 'function') refreshPunchUI();
 
+  resetManualToDefaults();
   alert('Quart de travail enregistré avec succès !');
 }
 window.handleManualSubmit = handleManualSubmit;
 
 // --- INITIALISATION DOM ---
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Thème
+  // 1. Appliquer le thème
   applyTheme(window.config ? window.config.theme : 'system');
 
-  // 2. Écran de config et visibilité
+  // 2. Initialiser l'écran de config
   populateConfigUI();
   updateVisibility();
 
-  // 3. Réinitialiser et lier le formulaire manuel
+  // 3. Initialiser les formulaires
   resetManualToDefaults();
   const manualForm = document.getElementById('manualEntryForm');
   if (manualForm) {
@@ -281,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // 4. Calendrier Agendrix
+  // 4. Charger et afficher le calendrier Agendrix si disponible
   if (typeof loadAgendrixCache === 'function') {
     const agendrixCache = loadAgendrixCache();
     if (agendrixCache && agendrixCache.length > 0) {
@@ -292,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 5. Résultats & Widgets
+  // 5. Mettre à jour les résultats et widgets
   if (typeof renderResults === 'function') renderResults();
   if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
 
