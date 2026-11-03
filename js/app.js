@@ -227,31 +227,30 @@ function handleManualSubmit(e) {
 
   const actualNet = Math.max(0, grossSec - pauseSec);
 
-  const currentLogs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
-  currentLogs.push({
+  const newShift = {
     id: Date.now(),
     date: dateVal,
     in: inVal,
+    timeIn: inVal,
     out: outVal,
+    timeOut: outVal,
     pauseSeconds: pauseSec,
-    actualNetSeconds: actualNet
-  });
+    totalPause: pauseSec,
+    actualNetSeconds: actualNet,
+    workedSec: actualNet,
+    source: 'manual'
+  };
 
+  const currentLogs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
+  currentLogs.push(newShift);
   currentLogs.sort((a, b) => b.date.localeCompare(a.date));
-  
+
   // Sauvegarde locale
   localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
 
   // Sauvegarde Cloud (Firestore)
-  if (typeof saveShiftToCloud === 'function') {
-    saveShiftToCloud({
-      id: Date.now(),
-      date: dateVal,
-      in: inVal,
-      out: outVal,
-      pauseSeconds: pauseSec,
-      actualNetSeconds: actualNet
-    });
+  if (typeof window.saveShiftToCloud === 'function') {
+    window.saveShiftToCloud(newShift);
   }
 
   if (typeof renderResults === 'function') renderResults();
