@@ -238,7 +238,21 @@ function handleManualSubmit(e) {
   });
 
   currentLogs.sort((a, b) => b.date.localeCompare(a.date));
+  
+  // Sauvegarde locale
   localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
+
+  // Sauvegarde Cloud (Firestore)
+  if (typeof saveShiftToCloud === 'function') {
+    saveShiftToCloud({
+      id: Date.now(),
+      date: dateVal,
+      in: inVal,
+      out: outVal,
+      pauseSeconds: pauseSec,
+      actualNetSeconds: actualNet
+    });
+  }
 
   if (typeof renderResults === 'function') renderResults();
   if (typeof render === 'function') render();

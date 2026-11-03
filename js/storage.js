@@ -1,132 +1,102 @@
-// --- GESTION DU STOCKAGE & ÉTAT GLOBAL ---
+// =========================================================
+// SYNCHRONISATION CLOUD & AUTHENTIFICATION (STORAGE.JS)
+// =========================================================
 
-const DEFAULT_CONFIG = {
-  theme: 'system',
-  defaultIn: '08:30',
-  defaultOut: '17:00',
-  defaultPause: '30m',
-  agendrixUrl: 'https://app.agendrix.com/api/calendar/74b512f9-f575-45b1-938a-2260e20c2c13.ics',
-  calPastShifts: 5,
-  calFutureShifts: 15,
-  showScheduleTab: true,
-  showHistory: true,
-  showManual: true,
-  showDayRemaining: true
+// Configuration Firebase PunchWorkPro
+const firebaseConfig = {
+  apiKey: "AIzaSyDXhvynS5M5kPN_5exuO0TRbsKwe9l7mzI",
+  authDomain: "punchworkpro.firebaseapp.com",
+  projectId: "punchworkpro",
+  storageBucket: "punchworkpro.firebasestorage.app",
+  messagingSenderId: "749450545932",
+  appId: "1:749450545932:web:d41d3a2cc23b1b26b69729"
 };
 
-// Chargement et sauvegarde de la configuration
-function loadConfig() {
-  const raw = localStorage.getItem('punch_config');
-  if (!raw) return { ...DEFAULT_CONFIG };
-  try {
-    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
-  } catch (e) {
-    return { ...DEFAULT_CONFIG };
-  }
+// Initialisation de Firebase
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
 }
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-function saveConfig(cfg) {
-  localStorage.setItem('punch_config', JSON.stringify(cfg));
-}
+let currentUser = null;
 
-// État du quart en cours (Punch actif)
-function loadPunchState() {
-  const raw = localStorage.getItem('punch_state');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
-}
+// Écouteur en direct du statut de connexion
+auth.onAuthStateChanged(async (user) => {
+  currentUser = user;
+  const btnLogin = document.getElementById('btnGoogleLogin');
+  const userProfile = document.getElementById('userProfile');
+  const userName = document.getElementById('userDisplayName');
 
-function savePunchState(state) {
-  if (state === null) {
-    localStorage.removeItem('punch_state');
+  if (user) {
+    if (btnLogin) btnLogin.style.display = 'none';
+    if (userProfile) userProfile.style.display = 'flex';
+    if (userName) userName.textContent = user.displayName || user.email;
+
+    // Télécharger automatiquement les données de l'utilisateur depuis le Cloud
+    await loadShiftsFromCloud();
   } else {
-    localStorage.setItem('punch_state', JSON.stringify(state));
+    if (btnLogin) btnLogin.style.display = 'inline-block';
+    if (userProfile) userProfile.style.display = 'none';
   }
-}
+});
 
-// Historique des quarts enregistrés
-function loadShifts() {
-  const raw = localStorage.getItem('punch_shifts');
-  if (!raw) return [];
+// Connexion Google
+function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch((error) => {
+    console.warn("Popup bloquée, basculement en redirection :", error);
+    auth.signInWithRedirect(provider);
+  });
+}
+window.loginWithGoogle = loginWithGoogle;
+
+// Déconnexion
+function logoutUser() {
+  auth.signOut().then(() => {
+    localStorage.removeItem('shift_tracker_logs');
+    if (typeof renderResults === 'function') renderResults();
+    if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
+  });
+}
+window.logoutUser = logoutUser;
+
+// Charger les quarts de travail depuis Firestore
+async function loadShiftsFromCloud() {
+  if (!currentUser) return;
   try {
-    return JSON.parse(raw);
-  } catch (e) {
-    return [];
+    const snapshot = await db.collection('users').doc(currentUser.uid).collection('shifts').get();
+    const loadedLogs = [];
+    snapshot.forEach(doc => {
+      loadedLogs.push(doc.data());
+    });
+
+    if (loadedLogs.length > 0) {
+      loadedLogs.sort((a, b) => b.date.localeCompare(a.date));
+      localStorage.setItem('shift_tracker_logs', JSON.stringify(loadedLogs));
+      if (typeof renderResults === 'function') renderResults();
+      if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
+    }
+  } catch (err) {
+    console.error("Erreur lecture Firestore :", err);
   }
 }
+window.loadShiftsFromCloud = loadShiftsFromCloud;
 
-function saveShifts(shifts) {
-  localStorage.setItem('punch_shifts', JSON.stringify(shifts));
-}
-
-// Cache du calendrier Agendrix
-function loadAgendrixCache() {
-  const raw = localStorage.getItem('punch_agendrix_cache');
-  if (!raw) return null;
+// Enregistrer ou mettre à jour un quart dans Firestore
+async function saveShiftToCloud(shiftData) {
+  if (!currentUser) return;
   try {
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
+    const docId = String(shiftData.id || Date.now());
+    await db.collection('users').doc(currentUser.uid).collection('shifts').doc(docId).set(shiftData);
+  } catch (err) {
+    console.error("Erreur écriture Firestore :", err);
   }
 }
+window.saveShiftToCloud = saveShiftToCloud;
 
-function saveAgendrixCache(data) {
-  localStorage.setItem('punch_agendrix_cache', JSON.stringify(data));
-}
-
-// --- FONCTIONS UTILITAIRES DE TEMPS & CONVERSION ---
-
-function parseTimeToMin(timeStr) {
-  if (!timeStr) return 0;
-  const [h, m] = timeStr.split(':').map(Number);
-  return (h * 60) + (m || 0);
-}
-
-function parsePauseToMin(pauseStr) {
-  if (!pauseStr) return 0;
-  const match = pauseStr.match(/(\d+)/);
-  return match ? parseInt(match[1], 10) : 0;
-}
-
-function parsePauseToSec(pauseStr) {
-  return parsePauseToMin(pauseStr) * 60;
-}
-
-function formatSec(totalSec) {
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-function formatMinToHoursMins(totalMin) {
-  const sign = totalMin < 0 ? '-' : '+';
-  const abs = Math.abs(totalMin);
-  const h = Math.floor(abs / 60);
-  const m = abs % 60;
-  return `${sign}${h}h ${String(m).padStart(2, '0')}m`;
-}
-
-function getTodayIsoDate() {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getNowTimeStr() {
-  const d = new Date();
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-// Variables globales partagées initialisées
-let config = loadConfig();
-let shifts = loadShifts();
-let isSafetyLocked = true;
+// Lier les clics sur les boutons
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btnGoogleLogin')?.addEventListener('click', loginWithGoogle);
+  document.getElementById('btnGoogleLogout')?.addEventListener('click', logoutUser);
+});

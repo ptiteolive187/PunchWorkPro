@@ -23,8 +23,32 @@
   }
   </script>
 
+<!-- SDKs Firebase Compat -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<!-- Scripts de l'application -->
+<script src="js/storage.js"></script>
+<script src="js/agendrix.js"></script>
+<script src="js/results.js"></script>
+<script src="js/punch.js"></script>
+<script src="js/app.js"></script>
+
 </head>
 <body>
+
+<div id="authContainer" style="padding: 10px 15px; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
+  <button id="btnGoogleLogin" type="button" class="btn" style="background: #4285F4; color: white; padding: 7px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+    Se connecter avec Google
+  </button>
+  <div id="userProfile" style="display: none; align-items: center; gap: 8px;">
+    <span id="userDisplayName" style="font-size: 0.85rem; font-weight: 600;"></span>
+    <button id="btnGoogleLogout" type="button" class="btn" style="background: #2a2a2a; color: #fff; padding: 5px 9px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem;">
+      Déconnexion
+    </button>
+  </div>
+</div>
 
 <div class="wrap">
 
@@ -348,13 +372,6 @@
     <span>Config</span>
   </button>
 </nav>
-
-<!-- CHARGEMENT DES SCRIPTS JS MODULAIRES -->
-<script src="js/storage.js"></script>
-<script src="js/agendrix.js"></script>
-<script src="js/results.js"></script>
-<script src="js/punch.js"></script>
-<script src="js/app.js"></script>
 
 </body>
 </html>
