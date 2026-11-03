@@ -1,50 +1,34 @@
-// --- POINT D'ENTRÉE PRINCIPAL & NAVIGATION ---
+// =========================================================
+// POINT D'ENTRÉE PRINCIPAL & NAVIGATION (APP.JS)
+// =========================================================
 
-// Navigation entre les onglets
-function switchTab(tabName, clickedBtn) {
-  // Masquer tous les onglets
-  document.querySelectorAll('.tab-content').forEach(tab => {
-    tab.classList.remove('active');
-  });
+// Configuration par défaut sécurisée si non initialisée
+window.config = window.config || {
+  theme: 'system',
+  defaultIn: '08:30',
+  defaultOut: '17:00',
+  defaultPause: '30m',
+  agendrixUrl: '',
+  calPastShifts: 5,
+  calFutureShifts: 15,
+  showScheduleTab: true,
+  showHistory: true,
+  showManual: true,
+  showDayRemaining: true
+};
 
-  // Désactiver tous les boutons de navigation
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-
-  // Activer l'onglet demandé
-  const targetTab = document.getElementById(`tab-${tabName}`);
-  if (targetTab) {
-    targetTab.classList.add('active');
-  }
-
-  // Activer le bouton correspondant
-  if (clickedBtn) {
-    clickedBtn.classList.add('active');
-  } else {
-    const defaultBtn = document.getElementById(`navBtn-${tabName}`);
-    if (defaultBtn) defaultBtn.classList.add('active');
-  }
-
-  // Actions spécifiques lors de l'ouverture d'un onglet
-  if (tabName === 'results') {
-    renderResults();
-  } else if (tabName === 'schedule') {
-    const cache = loadAgendrixCache();
-    if (cache) renderAgendrixCalendar(cache);
-  }
-}
-
-// Gestion des thèmes visuels
+// --- GESTION DU THÈME ---
 function applyTheme(themeChoice) {
   const body = document.body;
-  if (themeChoice === 'dark') {
+  if (!body) return;
+  const choice = themeChoice || (window.config ? window.config.theme : 'system');
+
+  if (choice === 'dark') {
     body.classList.remove('light-theme');
-  } else if (themeChoice === 'light') {
+  } else if (choice === 'light') {
     body.classList.add('light-theme');
   } else {
-    // Mode système automatique
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (prefersDark) {
       body.classList.remove('light-theme');
     } else {
@@ -52,25 +36,60 @@ function applyTheme(themeChoice) {
     }
   }
 }
+window.applyTheme = applyTheme;
 
 function changeTheme(themeChoice) {
-  config.theme = themeChoice;
+  if (window.config) window.config.theme = themeChoice;
   applyTheme(themeChoice);
 }
+window.changeTheme = changeTheme;
 
-// Écouteur en direct des changements de mode système de l'appareil
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if (config.theme === 'system') {
-    applyTheme('system');
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (window.config && window.config.theme === 'system') {
+      applyTheme('system');
+    }
+  });
+}
+
+// --- NAVIGATION ENTRE ONGLETS ---
+function switchTab(tabName, clickedBtn) {
+  document.querySelectorAll('.tab-content').forEach(tab => {
+    tab.classList.remove('active');
+  });
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  const targetTab = document.getElementById(`tab-${tabName}`);
+  if (targetTab) {
+    targetTab.classList.add('active');
   }
-});
 
-// Gestion de la visibilité des sections selon la configuration
+  if (clickedBtn) {
+    clickedBtn.classList.add('active');
+  } else {
+    const defaultBtn = document.getElementById(`navBtn-${tabName}`);
+    if (defaultBtn) defaultBtn.classList.add('active');
+  }
+
+  if (tabName === 'results' && typeof renderResults === 'function') {
+    renderResults();
+  } else if (tabName === 'schedule') {
+    if (typeof loadAgendrixCache === 'function' && typeof renderAgendrixCalendar === 'function') {
+      const cache = loadAgendrixCache();
+      if (cache) renderAgendrixCalendar(cache);
+    }
+  }
+}
+window.switchTab = switchTab;
+
+// --- GESTION DE LA CONFIGURATION ---
 function updateVisibility() {
   const showSched = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
   const showHist = document.getElementById('cfgShowHistory')?.checked ?? true;
   const showMan = document.getElementById('cfgShowManual')?.checked ?? true;
-  const showRem = document.getElementById('cfgShowDayRemaining')?.checked ?? true;
 
   const navSched = document.getElementById('navBtn-schedule');
   if (navSched) navSched.style.display = showSched ? 'flex' : 'none';
@@ -81,75 +100,103 @@ function updateVisibility() {
   const secMan = document.getElementById('manualCardSection');
   if (secMan) secMan.style.display = showMan ? 'block' : 'none';
 }
+window.updateVisibility = updateVisibility;
 
-// Remplissage du formulaire de configuration avec les valeurs actuelles
 function populateConfigUI() {
+  const cfg = window.config || {};
   const themeSel = document.getElementById('cfgTheme');
-  if (themeSel) themeSel.value = config.theme || 'system';
+  if (themeSel) themeSel.value = cfg.theme || 'system';
 
   const defIn = document.getElementById('cfgDefaultIn');
-  if (defIn) defIn.value = config.defaultIn || '08:30';
+  if (defIn) defIn.value = cfg.defaultIn || '08:30';
 
   const defOut = document.getElementById('cfgDefaultOut');
-  if (defOut) defOut.value = config.defaultOut || '17:00';
+  if (defOut) defOut.value = cfg.defaultOut || '17:00';
 
   const defPause = document.getElementById('cfgDefaultPause');
-  if (defPause) defPause.value = config.defaultPause || '30m';
+  if (defPause) defPause.value = cfg.defaultPause || '30m';
 
   const agUrl = document.getElementById('cfgAgendrixUrl');
-  if (agUrl) agUrl.value = config.agendrixUrl || '';
+  if (agUrl) agUrl.value = cfg.agendrixUrl || '';
 
   const pastSh = document.getElementById('cfgCalPastShifts');
-  if (pastSh) pastSh.value = config.calPastShifts ?? 5;
+  if (pastSh) pastSh.value = cfg.calPastShifts ?? 5;
 
   const futSh = document.getElementById('cfgCalFutureShifts');
-  if (futSh) futSh.value = config.calFutureShifts ?? 15;
+  if (futSh) futSh.value = cfg.calFutureShifts ?? 15;
 
   const cbSched = document.getElementById('cfgShowScheduleTab');
-  if (cbSched) cbSched.checked = config.showScheduleTab ?? true;
+  if (cbSched) cbSched.checked = cfg.showScheduleTab ?? true;
 
   const cbHist = document.getElementById('cfgShowHistory');
-  if (cbHist) cbHist.checked = config.showHistory ?? true;
+  if (cbHist) cbHist.checked = cfg.showHistory ?? true;
 
   const cbMan = document.getElementById('cfgShowManual');
-  if (cbMan) cbMan.checked = config.showManual ?? true;
+  if (cbMan) cbMan.checked = cfg.showManual ?? true;
 
   const cbRem = document.getElementById('cfgShowDayRemaining');
-  if (cbRem) cbRem.checked = config.showDayRemaining ?? true;
+  if (cbRem) cbRem.checked = cfg.showDayRemaining ?? true;
 }
+window.populateConfigUI = populateConfigUI;
 
-// Sauvegarde des paramètres modifiés par l'utilisateur
 function saveConfiguration() {
-  config.theme = document.getElementById('cfgTheme').value;
-  config.defaultIn = document.getElementById('cfgDefaultIn').value;
-  config.defaultOut = document.getElementById('cfgDefaultOut').value;
-  config.defaultPause = document.getElementById('cfgDefaultPause').value;
-  config.agendrixUrl = document.getElementById('cfgAgendrixUrl').value.trim();
-  config.calPastShifts = parseInt(document.getElementById('cfgCalPastShifts').value, 10) || 0;
-  config.calFutureShifts = parseInt(document.getElementById('cfgCalFutureShifts').value, 10) || 15;
+  const cfg = window.config || {};
+  cfg.theme = document.getElementById('cfgTheme')?.value || 'system';
+  cfg.defaultIn = document.getElementById('cfgDefaultIn')?.value || '08:30';
+  cfg.defaultOut = document.getElementById('cfgDefaultOut')?.value || '17:00';
+  cfg.defaultPause = document.getElementById('cfgDefaultPause')?.value || '30m';
+  cfg.agendrixUrl = document.getElementById('cfgAgendrixUrl')?.value.trim() || '';
+  cfg.calPastShifts = parseInt(document.getElementById('cfgCalPastShifts')?.value, 10) || 5;
+  cfg.calFutureShifts = parseInt(document.getElementById('cfgCalFutureShifts')?.value, 10) || 15;
 
-  config.showScheduleTab = document.getElementById('cfgShowScheduleTab').checked;
-  config.showHistory = document.getElementById('cfgShowHistory').checked;
-  config.showManual = document.getElementById('cfgShowManual').checked;
-  config.showDayRemaining = document.getElementById('cfgShowDayRemaining').checked;
+  cfg.showScheduleTab = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
+  cfg.showHistory = document.getElementById('cfgShowHistory')?.checked ?? true;
+  cfg.showManual = document.getElementById('cfgShowManual')?.checked ?? true;
+  cfg.showDayRemaining = document.getElementById('cfgShowDayRemaining')?.checked ?? true;
 
-  saveConfig(config);
-  applyTheme(config.theme);
+  if (typeof saveConfig === 'function') {
+    saveConfig(cfg);
+  } else {
+    localStorage.setItem('shift_tracker_config', JSON.stringify(cfg));
+  }
+
+  applyTheme(cfg.theme);
   updateVisibility();
 
-  // Actualisation des données d'affichage
-  const cache = loadAgendrixCache();
-  updateTodayShiftWidget(cache);
-  renderResults();
-  refreshPunchUI();
+  if (typeof loadAgendrixCache === 'function' && typeof updateTodayShiftWidget === 'function') {
+    const cache = loadAgendrixCache();
+    updateTodayShiftWidget(cache);
+  }
+  if (typeof renderResults === 'function') renderResults();
+  if (typeof refreshPunchUI === 'function') refreshPunchUI();
 
   alert('Configuration enregistrée avec succès !');
 }
+window.saveConfiguration = saveConfiguration;
 
+// --- GESTION DU FORMULAIRE MANUEL ---
+function resetManualToDefaults() {
+  const cfg = window.config || {};
+  const dIn = cfg.defaultIn || "08:30";
+  const dOut = cfg.defaultOut || "17:00";
+  const dPause = cfg.defaultPause || "30m";
 
-// Fonction de soumission manuelle d'un quart
+  const manDate = document.getElementById('manDate');
+  const manIn = document.getElementById('manIn');
+  const manOut = document.getElementById('manOut');
+  const manPause = document.getElementById('manPause');
+
+  if (manDate) manDate.value = new Date().toISOString().split('T')[0];
+  if (manIn) manIn.value = dIn;
+  if (manOut) manOut.value = dOut;
+  if (manPause) manPause.value = dPause;
+}
+window.resetManualToDefaults = resetManualToDefaults;
+
 function handleManualSubmit(e) {
-  if (e) e.preventDefault();
+  if (e && typeof e.preventDefault === 'function') {
+    e.preventDefault();
+  }
 
   const manDate = document.getElementById('manDate');
   const manIn = document.getElementById('manIn');
@@ -163,15 +210,19 @@ function handleManualSubmit(e) {
   const outVal = manOut.value;
   const pauseVal = (manPause && manPause.value) ? manPause.value : "30m";
 
-  // Calcul des secondes de travail
+  if (!dateVal || !inVal || !outVal) {
+    alert('Veuillez remplir au moins la date, l\'heure d\'arrivée et l\'heure de départ.');
+    return;
+  }
+
   const [inH, inM] = inVal.split(':').map(Number);
   const [outH, outM] = outVal.split(':').map(Number);
-  const startSec = inH * 3600 + inM * 60;
-  const endSec = outH * 3600 + outM * 60;
+  const startSec = (inH || 0) * 3600 + (inM || 0) * 60;
+  const endSec = (outH || 0) * 3600 + (outM || 0) * 60;
   const grossSec = Math.max(0, endSec - startSec);
 
-  const pauseSec = (typeof parsePauseToSec === 'function') 
-    ? parsePauseToSec(pauseVal) 
+  const pauseSec = (typeof parsePauseToSec === 'function')
+    ? parsePauseToSec(pauseVal)
     : 1800;
 
   const actualNet = Math.max(0, grossSec - pauseSec);
@@ -189,67 +240,51 @@ function handleManualSubmit(e) {
   currentLogs.sort((a, b) => b.date.localeCompare(a.date));
   localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
 
+  if (typeof renderResults === 'function') renderResults();
   if (typeof render === 'function') render();
   if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
-  if (typeof resetManualToDefaults === 'function') resetManualToDefaults();
+  resetManualToDefaults();
 
   alert('Quart de travail enregistré avec succès !');
 }
 window.handleManualSubmit = handleManualSubmit;
 
-// Fonction de réinitialisation sécurisée du formulaire manuel
-function resetManualToDefaults() {
-  const defaultIn = (window.config && window.config.defaultIn) ? window.config.defaultIn : "08:30";
-  const defaultOut = (window.config && window.config.defaultOut) ? window.config.defaultOut : "17:00";
-  const defaultPause = (window.config && window.config.defaultPause) ? window.config.defaultPause : "30m";
-
-  const manDate = document.getElementById('manDate');
-  const manIn = document.getElementById('manIn');
-  const manOut = document.getElementById('manOut');
-  const manPause = document.getElementById('manPause');
-
-  if (manDate) manDate.value = new Date().toISOString().split('T')[0];
-  if (manIn) manIn.value = defaultIn;
-  if (manOut) manOut.value = defaultOut;
-  if (manPause) manPause.value = defaultPause;
-}
-window.resetManualToDefaults = resetManualToDefaults;
-
-// INITIALISATION AU CHARGEMENT DE LA PAGE
+// --- INITIALISATION DOM ---
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Appliquer le thème sauvegardé
-  applyTheme(config.theme);
+  // 1. Thème
+  applyTheme(window.config ? window.config.theme : 'system');
 
-  // 2. Charger les valeurs dans l'écran de configuration
+  // 2. Écran de config et visibilité
   populateConfigUI();
   updateVisibility();
 
-  // 3. Initialiser les formulaires
+  // 3. Réinitialiser et lier le formulaire manuel
   resetManualToDefaults();
   const manualForm = document.getElementById('manualEntryForm');
-if (manualForm) {
-  manualForm.addEventListener('submit', (e) => {
-    if (typeof window.handleManualSubmit === 'function') {
-      window.handleManualSubmit(e);
-    }
-  });
-}
+  if (manualForm) {
+    manualForm.onsubmit = function(e) {
+      handleManualSubmit(e);
+      return false;
+    };
+  }
 
-  // 4. Charger et afficher le calendrier Agendrix en cache
-  const agendrixCache = loadAgendrixCache();
-  if (agendrixCache && agendrixCache.length > 0) {
-    renderAgendrixCalendar(agendrixCache);
-    updateTodayShiftWidget(agendrixCache);
-  } else {
-    // Premier chargement automatique si URL configurée
-    if (config.agendrixUrl) {
+  // 4. Calendrier Agendrix
+  if (typeof loadAgendrixCache === 'function') {
+    const agendrixCache = loadAgendrixCache();
+    if (agendrixCache && agendrixCache.length > 0) {
+      if (typeof renderAgendrixCalendar === 'function') renderAgendrixCalendar(agendrixCache);
+      if (typeof updateTodayShiftWidget === 'function') updateTodayShiftWidget(agendrixCache);
+    } else if (window.config && window.config.agendrixUrl && typeof fetchAgendrixShifts === 'function') {
       fetchAgendrixShifts();
     }
   }
 
-  // 5. Mettre à jour l'onglet Résultats
-  renderResults();
+  // 5. Résultats & Widgets
+  if (typeof renderResults === 'function') renderResults();
+  if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
 
-  // 6. Lancer le moteur du chronomètre de pointage
-  initPunchEngine();
+  // 6. Chronomètre
+  if (typeof initPunchEngine === 'function') {
+    initPunchEngine();
+  }
 });
