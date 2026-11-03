@@ -12,6 +12,15 @@
   <meta name="theme-color" content="#000000">
 
   <link rel="stylesheet" href="style.css">
+
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
+    });
+  }
+</script>
+
 </head>
 <body>
 
