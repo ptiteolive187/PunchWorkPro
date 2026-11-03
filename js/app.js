@@ -146,6 +146,24 @@ function saveConfiguration() {
   alert('Configuration enregistrée avec succès !');
 }
 
+// Fonction de réinitialisation sécurisée du formulaire manuel
+function resetManualToDefaults() {
+  const defaultIn = (window.config && window.config.defaultIn) ? window.config.defaultIn : "08:30";
+  const defaultOut = (window.config && window.config.defaultOut) ? window.config.defaultOut : "17:00";
+  const defaultPause = (window.config && window.config.defaultPause) ? window.config.defaultPause : "30m";
+
+  const manDate = document.getElementById('manDate');
+  const manIn = document.getElementById('manIn');
+  const manOut = document.getElementById('manOut');
+  const manPause = document.getElementById('manPause');
+
+  if (manDate) manDate.value = new Date().toISOString().split('T')[0];
+  if (manIn) manIn.value = defaultIn;
+  if (manOut) manOut.value = defaultOut;
+  if (manPause) manPause.value = defaultPause;
+}
+window.resetManualToDefaults = resetManualToDefaults;
+
 // INITIALISATION AU CHARGEMENT DE LA PAGE
 document.addEventListener('DOMContentLoaded', () => {
   // 1. Appliquer le thème sauvegardé
