@@ -28,16 +28,29 @@ auth.onAuthStateChanged(async (user) => {
   const userProfile = document.getElementById('userProfile');
   const userName = document.getElementById('userDisplayName');
 
+  // Repère l'élément du badge (selon l'ID ou la classe dans ton HTML)
+  const syncBadge = document.querySelector('.badge-sync') || document.getElementById('syncStatusBadge');
+
   if (user) {
     if (btnLogin) btnLogin.style.display = 'none';
     if (userProfile) userProfile.style.display = 'flex';
     if (userName) userName.textContent = user.displayName || user.email;
 
-    // Télécharger automatiquement les données de l'utilisateur depuis le Cloud
+    // Mise à jour visuelle du badge
+    if (syncBadge) {
+      syncBadge.innerHTML = '☁️ Cloud (Synchronisé)';
+      syncBadge.style.color = '#4ade80'; // Vert clair
+    }
+
     await loadShiftsFromCloud();
   } else {
     if (btnLogin) btnLogin.style.display = 'inline-block';
     if (userProfile) userProfile.style.display = 'none';
+
+    if (syncBadge) {
+      syncBadge.innerHTML = '💾 Local (Appareil)';
+      syncBadge.style.color = '';
+    }
   }
 });
 
