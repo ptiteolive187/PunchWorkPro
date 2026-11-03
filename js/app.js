@@ -146,6 +146,57 @@ function saveConfiguration() {
   alert('Configuration enregistrée avec succès !');
 }
 
+
+// Fonction de soumission manuelle d'un quart
+function handleManualSubmit(e) {
+  if (e) e.preventDefault();
+
+  const manDate = document.getElementById('manDate');
+  const manIn = document.getElementById('manIn');
+  const manOut = document.getElementById('manOut');
+  const manPause = document.getElementById('manPause');
+
+  if (!manDate || !manIn || !manOut) return;
+
+  const dateVal = manDate.value;
+  const inVal = manIn.value;
+  const outVal = manOut.value;
+  const pauseVal = (manPause && manPause.value) ? manPause.value : "30m";
+
+  // Calcul des secondes de travail
+  const [inH, inM] = inVal.split(':').map(Number);
+  const [outH, outM] = outVal.split(':').map(Number);
+  const startSec = inH * 3600 + inM * 60;
+  const endSec = outH * 3600 + outM * 60;
+  const grossSec = Math.max(0, endSec - startSec);
+
+  const pauseSec = (typeof parsePauseToSec === 'function') 
+    ? parsePauseToSec(pauseVal) 
+    : 1800;
+
+  const actualNet = Math.max(0, grossSec - pauseSec);
+
+  const currentLogs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
+  currentLogs.push({
+    id: Date.now(),
+    date: dateVal,
+    in: inVal,
+    out: outVal,
+    pauseSeconds: pauseSec,
+    actualNetSeconds: actualNet
+  });
+
+  currentLogs.sort((a, b) => b.date.localeCompare(a.date));
+  localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
+
+  if (typeof render === 'function') render();
+  if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
+  if (typeof resetManualToDefaults === 'function') resetManualToDefaults();
+
+  alert('Quart de travail enregistré avec succès !');
+}
+window.handleManualSubmit = handleManualSubmit;
+
 // Fonction de réinitialisation sécurisée du formulaire manuel
 function resetManualToDefaults() {
   const defaultIn = (window.config && window.config.defaultIn) ? window.config.defaultIn : "08:30";
@@ -175,10 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 3. Initialiser les formulaires
   resetManualToDefaults();
-  const manualForm = document.getElementById('manualForm');
-  if (manualForm) {
-    manualForm.addEventListener('submit', handleManualSubmit);
-  }
+  const manualForm = document.getElementById('manualEntryForm');
+if (manualForm) {
+  manualForm.addEventListener('submit', (e) => {
+    if (typeof window.handleManualSubmit === 'function') {
+      window.handleManualSubmit(e);
+    }
+  });
+}
 
   // 4. Charger et afficher le calendrier Agendrix en cache
   const agendrixCache = loadAgendrixCache();
