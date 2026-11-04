@@ -28,23 +28,39 @@ async function fetchAgendrixShifts() {
 
   try {
     let icsData = null;
+    const encodedUrl = encodeURIComponent(targetUrl);
 
-    // Tentative 1 : Accès direct
-    try {
-      const resp = await fetch(targetUrl);
-      if (resp.ok) icsData = await resp.text();
-    } catch (e) {
-      // Restriction CORS normale sur navigateur
+    // Liste de proxys CORS avec bascule automatique si l'un est hors-ligne (503)
+    const proxyList = [
+      `https://corsproxy.io/?url=${encodedUrl}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`,
+      `https://api.allorigins.win/get?url=${encodedUrl}`
+    ];
+
+    for (const proxyUrl of proxyList) {
+      try {
+        const resp = await fetch(proxyUrl);
+        if (!resp.ok) continue;
+
+        if (proxyUrl.includes('allorigins.win/get')) {
+          const json = await resp.json();
+          if (json && json.contents && json.contents.includes('BEGIN:VCALENDAR')) {
+            icsData = json.contents;
+            break;
+          }
+        } else {
+          const text = await resp.text();
+          if (text && text.includes('BEGIN:VCALENDAR')) {
+            icsData = text;
+            break;
+          }
+        }
+      } catch (e) {
+        // Passe silencieusement au proxy suivant
+      }
     }
 
-    // Tentative 2 : Proxy CORS sécurisé
-    if (!icsData) {
-      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
-      const respProxy = await fetch(proxyUrl);
-      if (respProxy.ok) icsData = await respProxy.text();
-    }
-
-    if (!icsData) throw new Error("Impossible de récupérer les données du calendrier.");
+    if (!icsData) throw new Error("Serveurs relais temporairement indisponibles.");
 
     const parsedShifts = parseICS(icsData);
     saveAgendrixCache(parsedShifts);
@@ -59,7 +75,7 @@ async function fetchAgendrixShifts() {
   } catch (err) {
     if (statusEl) {
       statusEl.style.color = 'var(--red)';
-      statusEl.textContent = `❌ Erreur : ${err.message}. Vous pouvez importer le fichier .ics manuellement.`;
+      statusEl.textContent = `❌ ${err.message} Vous pouvez importer le fichier .ics manuellement.`;
     }
   } finally {
     if (btnRefresh) btnRefresh.disabled = false;

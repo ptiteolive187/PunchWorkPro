@@ -2,7 +2,7 @@
 // SERVICE WORKER - PUNCH WORK PRO (SW.JS)
 // ==========================================
 
-const CACHE_NAME = 'punchworkpro-cache-v2.0.0';
+const CACHE_NAME = 'punchworkpro-cache-v2.0.1';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -47,13 +47,17 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+  if (!url.protocol.startsWith('http')) return;
+
   if (
     url.hostname.includes('firebase') ||
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('google.com') ||
     url.hostname.includes('allorigins.win') ||
+    url.hostname.includes('corsproxy.io') ||
+    url.hostname.includes('codetabs.com') ||
     url.hostname.includes('agendrix.com')
-  ) {
+    ) {
     return;
   }
 

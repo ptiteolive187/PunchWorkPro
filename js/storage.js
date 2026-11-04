@@ -106,13 +106,20 @@ const auth = typeof firebase !== 'undefined' ? firebase.auth() : null;
 const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
 
 if (db) {
-  db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn("Persistance Firestore : plusieurs onglets ouverts.");
-    } else if (err.code === 'unimplemented') {
-      console.warn("Persistance Firestore non supportée.");
+  const auth = typeof firebase !== 'undefined' ? firebase.auth() : null;
+  const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+
+  if (db && firebase.firestore.persistentLocalCache) {
+    try {
+      db.settings({
+        localCache: firebase.firestore.persistentLocalCache({
+          tabManager: firebase.firestore.persistentMultipleTabManager()
+        })
+      });
+      } catch (e) {
+      // Déjà initialisé
     }
-  });
+  }
 }
 
 let currentUser = null;
