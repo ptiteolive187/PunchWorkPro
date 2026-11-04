@@ -91,6 +91,10 @@ function togglePause() {
   refreshPunchUI();
 }
 
+// Rendre la fonction accessible partout (pour onclick et les écouteurs)
+window.togglePause = togglePause;
+window.toggleWorkPause = togglePause; // Alias de sécurité
+
 function finishWorkDay() {
   const st = getPunch();
   if (!st) return;
