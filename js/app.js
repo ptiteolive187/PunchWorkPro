@@ -2,20 +2,9 @@
 // POINT D'ENTRÉE PRINCIPAL & NAVIGATION (APP.JS)
 // =========================================================
 
-// Configuration par défaut sécurisée si non initialisée
-window.config = window.config || {
-  theme: 'system',
-  defaultIn: '08:30',
-  defaultOut: '17:00',
-  defaultPause: '30m',
-  agendrixUrl: '',
-  calPastShifts: 5,
-  calFutureShifts: 15,
-  showScheduleTab: true,
-  showHistory: true,
-  showManual: true,
-  showDayRemaining: true
-};
+if (typeof loadConfig === 'function') {
+  loadConfig();
+}
 
 // --- GESTION DU THÈME ---
 function applyTheme(themeChoice) {
@@ -40,6 +29,7 @@ window.applyTheme = applyTheme;
 
 function changeTheme(themeChoice) {
   if (window.config) window.config.theme = themeChoice;
+  if (typeof saveConfig === 'function') saveConfig(window.config);
   applyTheme(themeChoice);
 }
 window.changeTheme = changeTheme;
@@ -74,12 +64,12 @@ function switchTab(tabName, clickedBtn) {
     if (defaultBtn) defaultBtn.classList.add('active');
   }
 
-  if (tabName === 'results' && typeof renderResults === 'function') {
-    renderResults();
+  if (tabName === 'results' && typeof render === 'function') {
+    render();
   } else if (tabName === 'schedule') {
     if (typeof loadAgendrixCache === 'function' && typeof renderAgendrixCalendar === 'function') {
       const cache = loadAgendrixCache();
-      if (cache) renderAgendrixCalendar(cache);
+      renderAgendrixCalendar(cache);
     }
   }
 }
@@ -90,6 +80,14 @@ function updateVisibility() {
   const showSched = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
   const showHist = document.getElementById('cfgShowHistory')?.checked ?? true;
   const showMan = document.getElementById('cfgShowManual')?.checked ?? true;
+  const showRem = document.getElementById('cfgShowDayRemaining')?.checked ?? true;
+
+  if (window.config) {
+    window.config.showScheduleTab = showSched;
+    window.config.showHistory = showHist;
+    window.config.showManual = showMan;
+    window.config.showDayRemaining = showRem;
+  }
 
   const navSched = document.getElementById('navBtn-schedule');
   if (navSched) navSched.style.display = showSched ? 'flex' : 'none';
@@ -99,6 +97,10 @@ function updateVisibility() {
 
   const secMan = document.getElementById('manualCardSection');
   if (secMan) secMan.style.display = showMan ? 'block' : 'none';
+
+  if (typeof updateTimerDisplay === 'function') {
+    updateTimerDisplay();
+  }
 }
 window.updateVisibility = updateVisibility;
 
@@ -146,8 +148,12 @@ function saveConfiguration() {
   cfg.defaultOut = document.getElementById('cfgDefaultOut')?.value || '17:00';
   cfg.defaultPause = document.getElementById('cfgDefaultPause')?.value || '30m';
   cfg.agendrixUrl = document.getElementById('cfgAgendrixUrl')?.value.trim() || '';
-  cfg.calPastShifts = parseInt(document.getElementById('cfgCalPastShifts')?.value, 10) || 5;
-  cfg.calFutureShifts = parseInt(document.getElementById('cfgCalFutureShifts')?.value, 10) || 15;
+
+  const parsedPast = parseInt(document.getElementById('cfgCalPastShifts')?.value, 10);
+  cfg.calPastShifts = isNaN(parsedPast) ? 5 : parsedPast;
+
+  const parsedFuture = parseInt(document.getElementById('cfgCalFutureShifts')?.value, 10);
+  cfg.calFutureShifts = isNaN(parsedFuture) ? 15 : parsedFuture;
 
   cfg.showScheduleTab = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
   cfg.showHistory = document.getElementById('cfgShowHistory')?.checked ?? true;
@@ -163,11 +169,12 @@ function saveConfiguration() {
   applyTheme(cfg.theme);
   updateVisibility();
 
-  if (typeof loadAgendrixCache === 'function' && typeof updateTodayShiftWidget === 'function') {
+  if (typeof loadAgendrixCache === 'function') {
     const cache = loadAgendrixCache();
-    updateTodayShiftWidget(cache);
+    if (typeof updateTodayShiftWidget === 'function') updateTodayShiftWidget(cache);
+    if (typeof renderAgendrixCalendar === 'function') renderAgendrixCalendar(cache);
   }
-  if (typeof renderResults === 'function') renderResults();
+  if (typeof render === 'function') render();
   if (typeof refreshPunchUI === 'function') refreshPunchUI();
 
   alert('Configuration enregistrée avec succès !');
@@ -186,19 +193,20 @@ function resetManualToDefaults() {
   const manOut = document.getElementById('manOut');
   const manPause = document.getElementById('manPause');
 
-  if (manDate) manDate.value = new Date().toISOString().split('T')[0];
+  if (manDate) manDate.value = typeof getTodayIsoDate === 'function' ? getTodayIsoDate() : new Date().toISOString().split('T')[0];
   if (manIn) manIn.value = dIn;
   if (manOut) manOut.value = dOut;
   if (manPause) manPause.value = dPause;
 }
 window.resetManualToDefaults = resetManualToDefaults;
 
-// --- SOUMISSION MANUELLE D'UN QUART ---
+// --- SOUMISSION MANUELLE OU MODIFICATION D'UN QUART ---
 function handleManualSubmit(e) {
   if (e && typeof e.preventDefault === 'function') {
     e.preventDefault();
   }
 
+  const editIdEl = document.getElementById('editId');
   const manDate = document.getElementById('manDate');
   const manIn = document.getElementById('manIn');
   const manOut = document.getElementById('manOut');
@@ -219,7 +227,8 @@ function handleManualSubmit(e) {
   const [inH, inM] = inVal.split(':').map(Number);
   const [outH, outM] = outVal.split(':').map(Number);
   const startSec = (inH || 0) * 3600 + (inM || 0) * 60;
-  const endSec = (outH || 0) * 3600 + (outM || 0) * 60;
+  let endSec = (outH || 0) * 3600 + (outM || 0) * 60;
+  if (endSec < startSec) endSec += 86400;
   const grossSec = Math.max(0, endSec - startSec);
 
   const pauseSec = (typeof parsePauseToSec === 'function')
@@ -227,10 +236,11 @@ function handleManualSubmit(e) {
     : 1800;
 
   const actualNet = Math.max(0, grossSec - pauseSec);
+  const editingId = editIdEl && editIdEl.value ? Number(editIdEl.value) : null;
 
-  // Objet quart avec l'intégralité des clés requises
-  const newShift = {
-    id: Date.now(),
+  const shiftId = editingId || Date.now();
+  const shiftObj = {
+    id: shiftId,
     date: dateVal,
     in: inVal,
     timeIn: inVal,
@@ -244,48 +254,47 @@ function handleManualSubmit(e) {
   };
 
   const currentLogs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
-  currentLogs.push(newShift);
-  currentLogs.sort((a, b) => b.date.localeCompare(a.date));
-
-  // 1. Sauvegarde locale
-  localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
-
-  // 2. Sauvegarde Cloud (Firestore) si la session est active
-  if (typeof window.saveShiftToCloud === 'function') {
-    window.saveShiftToCloud(newShift);
+  if (editingId) {
+    const idx = currentLogs.findIndex(x => Number(x.id) === editingId);
+    if (idx !== -1) {
+      currentLogs[idx] = shiftObj;
+    } else {
+      currentLogs.push(shiftObj);
+    }
+  } else {
+    currentLogs.push(shiftObj);
   }
 
-  // 3. Rafraîchissement complet des interfaces
-  if (typeof renderResults === 'function') renderResults();
+  currentLogs.sort((a, b) => b.date.localeCompare(a.date));
+  localStorage.setItem('shift_tracker_logs', JSON.stringify(currentLogs));
+
+  if (typeof window.saveShiftToCloud === 'function') {
+    window.saveShiftToCloud(shiftObj);
+  }
+
+  if (typeof cancelEditMode === 'function') {
+    cancelEditMode();
+  } else {
+    resetManualToDefaults();
+  }
+
   if (typeof render === 'function') render();
   if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
   if (typeof refreshPunchUI === 'function') refreshPunchUI();
 
-  resetManualToDefaults();
-  alert('Quart de travail enregistré avec succès !');
+  alert(editingId ? 'Quart modifié avec succès !' : 'Quart de travail enregistré avec succès !');
 }
 window.handleManualSubmit = handleManualSubmit;
 
 // --- INITIALISATION DOM ---
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Appliquer le thème
+  if (typeof loadConfig === 'function') loadConfig();
   applyTheme(window.config ? window.config.theme : 'system');
 
-  // 2. Initialiser l'écran de config
   populateConfigUI();
   updateVisibility();
-
-  // 3. Initialiser les formulaires
   resetManualToDefaults();
-  const manualForm = document.getElementById('manualEntryForm');
-  if (manualForm) {
-    manualForm.onsubmit = function(e) {
-      handleManualSubmit(e);
-      return false;
-    };
-  }
 
-  // 4. Charger et afficher le calendrier Agendrix si disponible
   if (typeof loadAgendrixCache === 'function') {
     const agendrixCache = loadAgendrixCache();
     if (agendrixCache && agendrixCache.length > 0) {
@@ -296,12 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 5. Mettre à jour les résultats et widgets
-  if (typeof renderResults === 'function') renderResults();
-  if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
-
-  // 6. Chronomètre
-  if (typeof initPunchEngine === 'function') {
-    initPunchEngine();
-  }
+  if (typeof render === 'function') render();
+  if (typeof initPunchEngine === 'function') initPunchEngine();
 });

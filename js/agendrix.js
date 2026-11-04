@@ -1,34 +1,45 @@
-// --- INTÉGRATION & PARSING AGENDRIX (iCal) ---
+// =========================================================
+// INTÉGRATION & PARSING AGENDRIX (AGENDRIX.JS)
+// =========================================================
 
-// Récupération des quarts via URL (avec proxy CORS de secours si nécessaire)
 async function fetchAgendrixShifts() {
   const statusEl = document.getElementById('agendrixStatus');
   const btnRefresh = document.getElementById('btnRefreshAgendrix');
   const btnConfig = document.getElementById('btnConfigSync');
+  const cfg = window.config || {};
 
-  if (!config.agendrixUrl) {
-    if (statusEl) statusEl.textContent = '❌ Aucune URL Agendrix configurée.';
+  const urlInput = document.getElementById('cfgAgendrixUrl');
+  const targetUrl = (urlInput && urlInput.value.trim()) ? urlInput.value.trim() : cfg.agendrixUrl;
+
+  if (!targetUrl) {
+    if (statusEl) statusEl.textContent = '⚠️ Aucune URL Agendrix configurée.';
     return;
   }
 
+  cfg.agendrixUrl = targetUrl;
+  if (typeof saveConfig === 'function') saveConfig(cfg);
+
   if (btnRefresh) btnRefresh.disabled = true;
   if (btnConfig) btnConfig.disabled = true;
-  if (statusEl) statusEl.textContent = '🔄 Téléchargement du calendrier Agendrix en cours...';
+  if (statusEl) {
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = '⏳ Téléchargement du calendrier Agendrix en cours...';
+  }
 
   try {
     let icsData = null;
 
     // Tentative 1 : Accès direct
     try {
-      const resp = await fetch(config.agendrixUrl);
+      const resp = await fetch(targetUrl);
       if (resp.ok) icsData = await resp.text();
     } catch (e) {
-      // Échec direct (souvent dû aux restrictions CORS du navigateur)
+      // Restriction CORS normale sur navigateur
     }
 
-    // Tentative 2 : Passage par un proxy CORS sécurisé si le direct est bloqué
+    // Tentative 2 : Proxy CORS sécurisé
     if (!icsData) {
-      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(config.agendrixUrl);
+      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
       const respProxy = await fetch(proxyUrl);
       if (respProxy.ok) icsData = await respProxy.text();
     }
@@ -39,6 +50,7 @@ async function fetchAgendrixShifts() {
     saveAgendrixCache(parsedShifts);
     renderAgendrixCalendar(parsedShifts);
     updateTodayShiftWidget(parsedShifts);
+    if (typeof render === 'function') render();
 
     if (statusEl) {
       statusEl.style.color = 'var(--green)';
@@ -47,15 +59,15 @@ async function fetchAgendrixShifts() {
   } catch (err) {
     if (statusEl) {
       statusEl.style.color = 'var(--red)';
-      statusEl.textContent = `⚠️ Erreur : ${err.message}. Vous pouvez importer le fichier .ics manuellement.`;
+      statusEl.textContent = `❌ Erreur : ${err.message}. Vous pouvez importer le fichier .ics manuellement.`;
     }
   } finally {
     if (btnRefresh) btnRefresh.disabled = false;
     if (btnConfig) btnConfig.disabled = false;
   }
 }
+window.fetchAgendrixShifts = fetchAgendrixShifts;
 
-// Importation locale d'un fichier .ics téléchargé
 function handleICSFile(event) {
   const file = event.target.files[0];
   const statusEl = document.getElementById('agendrixStatus');
@@ -68,6 +80,7 @@ function handleICSFile(event) {
       saveAgendrixCache(parsedShifts);
       renderAgendrixCalendar(parsedShifts);
       updateTodayShiftWidget(parsedShifts);
+      if (typeof render === 'function') render();
 
       if (statusEl) {
         statusEl.style.color = 'var(--green)';
@@ -82,8 +95,8 @@ function handleICSFile(event) {
   };
   reader.readAsText(file);
 }
+window.handleICSFile = handleICSFile;
 
-// Analyse syntaxique du format iCalendar (VEVENT)
 function parseICS(icsContent) {
   const events = [];
   const lines = icsContent.split(/\r\n|\n|\r/);
@@ -119,18 +132,16 @@ function parseICS(icsContent) {
     }
   }
 
-  // Tri par date chronologique
   events.sort((a, b) => a.date.localeCompare(b.date));
   return events;
 }
+window.parseICS = parseICS;
 
-// Décomposition date/heure depuis le format UTC ou Local iCal
 function parseICalDateTime(line) {
   const parts = line.split(':');
   if (parts.length < 2) return null;
-  let val = parts[1].trim();
+  const val = parts[1].trim();
 
-  // Format type YYYYMMDDTHHMMSSZ
   const y = val.substring(0, 4);
   const m = val.substring(4, 6);
   const d = val.substring(6, 8);
@@ -140,9 +151,7 @@ function parseICalDateTime(line) {
     const hh = val.substring(9, 11);
     const mm = val.substring(11, 13);
     const ss = val.substring(13, 15) || '00';
-
     if (val.endsWith('Z')) {
-      // Date UTC convertie en heure locale de l'appareil
       dateObj = new Date(Date.UTC(+y, +m - 1, +d, +hh, +mm, +ss));
     } else {
       dateObj = new Date(+y, +m - 1, +d, +hh, +mm, +ss);
@@ -163,25 +172,6 @@ function parseICalDateTime(line) {
   };
 }
 
-// Récupération de la cible d'heures nettes d'un jour donné (Agendrix ou par défaut)
-function getPrescribedDaySeconds(dateStr) {
-  const cache = loadAgendrixCache();
-  const pauseSec = parsePauseToSec(config.defaultPause);
-
-  if (cache && cache.length > 0) {
-    const match = cache.find(s => s.date === dateStr);
-    if (match) {
-      const spanMin = parseTimeToMin(match.end) - parseTimeToMin(match.start);
-      return Math.max(0, (spanMin * 60) - pauseSec);
-    }
-  }
-
-  // Sinon fallback sur les horaires prescrits habituels
-  const defaultSpanMin = parseTimeToMin(config.defaultOut) - parseTimeToMin(config.defaultIn);
-  return Math.max(0, (defaultSpanMin * 60) - pauseSec);
-}
-
-// Rendu graphique de l'onglet Calendrier Agendrix
 function renderAgendrixCalendar(calendarData) {
   const container = document.getElementById('calendarDisplay');
   if (!container) return;
@@ -191,12 +181,13 @@ function renderAgendrixCalendar(calendarData) {
     return;
   }
 
+  const cfg = window.config || {};
   const todayStr = getTodayIsoDate();
-  const pastLimit = Number(config.calPastShifts ?? 5);
-  const futureLimit = Number(config.calFutureShifts ?? 15);
+  const pastLimit = Number(cfg.calPastShifts ?? 5);
+  const futureLimit = Number(cfg.calFutureShifts ?? 15);
 
-  const pastShifts = calendarData.filter(s => s.date < todayStr).slice(-pastLimit);
-  const futureShifts = calendarData.filter(s => s.date >= todayStr).slice(0, futureLimit);
+  const pastShifts = pastLimit > 0 ? calendarData.filter(s => s.date < todayStr).slice(-pastLimit) : [];
+  const futureShifts = futureLimit > 0 ? calendarData.filter(s => s.date >= todayStr).slice(0, futureLimit) : [];
   const visibleShifts = [...pastShifts, ...futureShifts];
 
   if (visibleShifts.length === 0) {
@@ -206,7 +197,7 @@ function renderAgendrixCalendar(calendarData) {
 
   let html = '';
   visibleShifts.forEach(shift => {
-    const [y, m, d] = shift.date.split('-');
+    const [y, m, d] = shift.date.split('-').map(Number);
     const shiftDateObj = new Date(y, m - 1, d);
     const dateFormatted = shiftDateObj.toLocaleDateString('fr-CA', { weekday: 'short', month: 'short', day: 'numeric' });
     const isToday = shift.date === todayStr;
@@ -226,30 +217,48 @@ function renderAgendrixCalendar(calendarData) {
 
   container.innerHTML = html;
 }
+window.renderAgendrixCalendar = renderAgendrixCalendar;
 
-// Mise à jour de l'aperçu "Prévu aujourd'hui" dans l'onglet Pointage
 function updateTodayShiftWidget(calendarData) {
   const targetEl = document.getElementById('pwTodayShiftHours');
   const subEl = document.getElementById('pwTodayShiftSub');
   if (!targetEl) return;
 
+  const cfg = window.config || {};
   const todayStr = getTodayIsoDate();
-  const match = (calendarData || []).find(s => s.date === todayStr);
+  const list = calendarData || loadAgendrixCache();
+  const match = (list || []).find(s => s.date === todayStr);
 
   if (match) {
     targetEl.textContent = `${match.start} ➔ ${match.end}`;
     if (subEl) subEl.textContent = 'Horaire Agendrix détecté';
   } else {
-    targetEl.textContent = `${config.defaultIn} ➔ ${config.defaultOut}`;
+    targetEl.textContent = `${cfg.defaultIn || '08:30'} ➔ ${cfg.defaultOut || '17:00'}`;
     if (subEl) subEl.textContent = 'Horaire habituel par défaut';
   }
 }
+window.updateTodayShiftWidget = updateTodayShiftWidget;
 
-// Préremplissage du formulaire manuel si l'on touche une carte du calendrier
 function selectShiftFromCalendar(date, start, end) {
-  switchTab('results', document.getElementById('navBtn-results'));
-  document.getElementById('manDate').value = date;
-  document.getElementById('manIn').value = start;
-  document.getElementById('manOut').value = end;
-  document.getElementById('manPause').value = config.defaultPause;
+  if (typeof switchTab === 'function') {
+    switchTab('results', document.getElementById('navBtn-results'));
+  }
+  if (typeof cancelEditMode === 'function') {
+    cancelEditMode();
+  }
+
+  const cfg = window.config || {};
+  const manDate = document.getElementById('manDate');
+  const manIn = document.getElementById('manIn');
+  const manOut = document.getElementById('manOut');
+  const manPause = document.getElementById('manPause');
+
+  if (manDate) manDate.value = date;
+  if (manIn) manIn.value = start;
+  if (manOut) manOut.value = end;
+  if (manPause) manPause.value = cfg.defaultPause || '30m';
+
+  const manSection = document.getElementById('manualCardSection');
+  if (manSection) manSection.scrollIntoView({ behavior: 'smooth' });
 }
+window.selectShiftFromCalendar = selectShiftFromCalendar;

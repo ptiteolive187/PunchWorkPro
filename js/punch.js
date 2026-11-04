@@ -4,7 +4,6 @@
 
 let punchInterval = null;
 
-// Helpers utilitaires de formatage
 function padZero(num) {
   return String(num).padStart(2, '0');
 }
@@ -17,17 +16,19 @@ function formatSecToHHMMSS(seconds) {
   return `${padZero(hrs)}:${padZero(mins)}:${padZero(secs)}`;
 }
 
+function formatSecToHMSLabel(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  return `${hrs}h ${padZero(mins)}m ${padZero(secs)}s`;
+}
+
 function getNowTimeStr() {
   const d = new Date();
   return `${padZero(d.getHours())}:${padZero(d.getMinutes())}`;
 }
 
-function getTodayDateStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${padZero(d.getMonth() + 1)}-${padZero(d.getDate())}`;
-}
-
-// Récupération et écriture de l'état du punch
 function getPunch() {
   try {
     return JSON.parse(localStorage.getItem('shift_tracker_punch_state'));
@@ -44,18 +45,35 @@ function setPunch(state) {
   }
 }
 
-// ---------------------------------------------------------
-// ACTIONS DE POINTAGE
-// ---------------------------------------------------------
+// --- HORLOGE & DATE EN DIRECT ---
+function updateLiveClockAndDate() {
+  const now = new Date();
+  const clockEl = document.getElementById('liveClockDisplay');
+  const dateEl = document.getElementById('punchLiveDate');
 
+  if (clockEl) {
+    clockEl.textContent = `${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+  }
+  if (dateEl) {
+    dateEl.textContent = now.toLocaleDateString('fr-CA', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short'
+    });
+  }
+}
+
+// --- ACTIONS DE POINTAGE ---
 function startWorkDay() {
   let st = getPunch();
   if (st && st.status !== 'stopped') return;
 
   const now = Date.now();
+  const todayStr = typeof getTodayIsoDate === 'function' ? getTodayIsoDate() : new Date().toISOString().split('T')[0];
+
   st = {
     status: 'working',
-    date: getTodayDateStr(),
+    date: todayStr,
     timeIn: getNowTimeStr(),
     workStart: now,
     workedSec: 0,
@@ -65,7 +83,6 @@ function startWorkDay() {
 
   setPunch(st);
   refreshPunchUI();
-  startPunchTimer();
 }
 
 function togglePause() {
@@ -74,13 +91,11 @@ function togglePause() {
 
   const now = Date.now();
   if (st.status === 'working') {
-    // Passage en pause
     st.workedSec = (st.workedSec || 0) + Math.floor((now - st.workStart) / 1000);
     st.workStart = null;
     st.pauseStart = now;
     st.status = 'paused';
   } else if (st.status === 'paused') {
-    // Reprise du travail
     st.pauseSec = (st.pauseSec || 0) + Math.floor((now - st.pauseStart) / 1000);
     st.pauseStart = null;
     st.workStart = now;
@@ -90,10 +105,6 @@ function togglePause() {
   setPunch(st);
   refreshPunchUI();
 }
-
-// Rendre la fonction accessible partout (pour onclick et les écouteurs)
-window.togglePause = togglePause;
-window.toggleWorkPause = togglePause; // Alias de sécurité
 
 function finishWorkDay() {
   const st = getPunch();
@@ -106,14 +117,13 @@ function finishWorkDay() {
 
   if (st.status === 'working') {
     totalWork += Math.floor((now - st.workStart) / 1000);
-  } else {
+  } else if (st.status === 'paused') {
     totalPause += Math.floor((now - st.pauseStart) / 1000);
   }
 
   const outStr = getNowTimeStr();
   const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
 
-  // Objet complet harmonisé pour Firestore et l'affichage des résultats
   const newShift = {
     id: Date.now(),
     date: st.date,
@@ -128,38 +138,43 @@ function finishWorkDay() {
     source: 'punch'
   };
 
-  // 1. Sauvegarde locale
   logs.push(newShift);
   logs.sort((a, b) => b.date.localeCompare(a.date));
   localStorage.setItem('shift_tracker_logs', JSON.stringify(logs));
 
-  // 2. Sauvegarde Cloud (Firestore) si connecté
   if (typeof window.saveShiftToCloud === 'function') {
     window.saveShiftToCloud(newShift);
   }
 
-  // 3. Réinitialisation du punch et actualisation visuelle
   setPunch(null);
-  stopPunchTimer();
   refreshPunchUI();
-  updatePunchWidgets();
-
-  if (typeof renderResults === 'function') renderResults();
   if (typeof render === 'function') render();
 }
 
-// ---------------------------------------------------------
-// RAFRAÎCHISSEMENT VISUEL & CHRONOMÈTRE
-// ---------------------------------------------------------
-
+// --- RAFRAÎCHISSEMENT VISUEL DU CHRONO & BANNIÈRES ---
 function updateTimerDisplay() {
+  updateLiveClockAndDate();
+
   const st = getPunch();
-  const timerMain = document.getElementById('punchTimerDisplay') || document.querySelector('.timer-main');
-  const pauseSub = document.getElementById('punchPauseDisplay') || document.querySelector('.pause-sub');
+  const timerMain = document.getElementById('punchTimerDisplay');
+  const pauseSub = document.getElementById('punchPauseDisplay');
+  const dayRemBanner = document.getElementById('dayRemainingBanner');
+  const dayRemTitle = document.getElementById('dayRemTitle');
+  const dayRemTimer = document.getElementById('dayRemTimer');
+  const dayRemSub = document.getElementById('dayRemSub');
+  const returnBanner = document.getElementById('returnBanner');
+  const returnRemText = document.getElementById('returnRemainingText');
+  const returnTimeText = document.getElementById('returnTimeText');
+
+  const cfg = window.config || {};
+  const targetPauseStr = cfg.defaultPause || '30m';
+  const targetPauseSec = typeof parsePauseToSec === 'function' ? parsePauseToSec(targetPauseStr) : 1800;
 
   if (!st || st.status === 'stopped') {
     if (timerMain) timerMain.textContent = '00:00:00';
-    if (pauseSub) pauseSub.textContent = 'Temps de pause : 0m (sur 30m)';
+    if (pauseSub) pauseSub.innerHTML = `Temps de pause : <strong>0m</strong> (sur ${targetPauseStr})`;
+    if (dayRemBanner) dayRemBanner.style.display = 'none';
+    if (returnBanner) returnBanner.style.display = 'none';
     return;
   }
 
@@ -178,26 +193,88 @@ function updateTimerDisplay() {
   }
 
   if (pauseSub) {
-    const pauseMins = Math.floor(currentPause / 60);
-    const targetPause = (window.config && window.config.defaultPause) ? window.config.defaultPause : '30m';
-    pauseSub.textContent = `Temps de pause : ${pauseMins}m (sur ${targetPause})`;
+    const pLabel = typeof formatPauseTime === 'function' ? formatPauseTime(currentPause) : `${Math.floor(currentPause / 60)}m`;
+    pauseSub.innerHTML = `Temps de pause : <strong>${pLabel}</strong> (sur ${targetPauseStr})`;
+  }
+
+  // 1. Bandeau Temps restant du jour
+  const showRem = cfg.showDayRemaining ?? true;
+  if (dayRemBanner) {
+    if (showRem) {
+      dayRemBanner.style.display = 'block';
+      const targetWorkSec = typeof getPrescribedDaySeconds === 'function' ? getPrescribedDaySeconds(st.date) : (8 * 3600);
+      const remainingWorkSec = targetWorkSec - currentWork;
+      const unpaidPauseLeft = st.status === 'working' ? Math.max(0, targetPauseSec - currentPause) : 0;
+
+      if (remainingWorkSec > 0) {
+        dayRemBanner.style.background = 'rgba(56, 189, 248, 0.08)';
+        dayRemBanner.style.border = '1px solid rgba(56, 189, 248, 0.25)';
+        if (dayRemTitle) {
+          dayRemTitle.textContent = '⏳ TEMPS RESTANT DU JOUR';
+          dayRemTitle.style.color = 'var(--blue)';
+        }
+        if (dayRemTimer) dayRemTimer.textContent = formatSecToHMSLabel(remainingWorkSec);
+
+        const estEndDate = new Date(now + (remainingWorkSec + unpaidPauseLeft) * 1000);
+        const estEndStr = `${padZero(estEndDate.getHours())}:${padZero(estEndDate.getMinutes())}`;
+        if (dayRemSub) dayRemSub.textContent = `Fin estimée à ${estEndStr} (cible ${(targetWorkSec / 3600).toFixed(2)}h)`;
+      } else {
+        const overtimeSec = Math.abs(remainingWorkSec);
+        dayRemBanner.style.background = 'rgba(34, 197, 94, 0.12)';
+        dayRemBanner.style.border = '1px solid rgba(34, 197, 94, 0.35)';
+        if (dayRemTitle) {
+          dayRemTitle.textContent = '✅ OBJECTIF DU JOUR ATTEINT';
+          dayRemTitle.style.color = 'var(--green)';
+        }
+        if (dayRemTimer) dayRemTimer.textContent = `+${formatSecToHMSLabel(overtimeSec)}`;
+        if (dayRemSub) dayRemSub.textContent = 'Temps supplémentaire accumulé dans la banque';
+      }
+    } else {
+      dayRemBanner.style.display = 'none';
+    }
+  }
+
+  // 2. Bannière Pause en cours
+  if (returnBanner) {
+    if (st.status === 'paused') {
+      returnBanner.style.display = 'flex';
+      const remPauseSec = targetPauseSec - currentPause;
+      const expectedReturnDate = new Date((st.pauseStart || now) + Math.max(0, targetPauseSec - (st.pauseSec || 0)) * 1000);
+      const returnStr = `${padZero(expectedReturnDate.getHours())}:${padZero(expectedReturnDate.getMinutes())}`;
+
+      if (returnTimeText) returnTimeText.textContent = returnStr;
+
+      if (remPauseSec >= 0) {
+        returnBanner.classList.remove('overtime');
+        const rm = Math.floor(remPauseSec / 60);
+        const rs = remPauseSec % 60;
+        if (returnRemText) returnRemText.textContent = `Pause restante : ${rm}m ${padZero(rs)}s`;
+      } else {
+        returnBanner.classList.add('overtime');
+        const over = Math.abs(remPauseSec);
+        const om = Math.floor(over / 60);
+        const os = over % 60;
+        if (returnRemText) returnRemText.textContent = `Pause dépassée de +${om}m ${padZero(os)}s`;
+      }
+    } else {
+      returnBanner.style.display = 'none';
+    }
   }
 }
 
 function refreshPunchUI() {
   const st = getPunch();
-  const statusBadge = document.getElementById('punchStatusBadge') || document.querySelector('.status-pill');
+  const statusBadge = document.getElementById('punchStatusBadge');
   const btnStart = document.getElementById('btnStartDay');
   const btnPause = document.getElementById('btnTogglePause');
   const btnFinish = document.getElementById('btnFinishDay');
-
-  // Gestion du badge Local / Cloud
-  const storageBadge = document.getElementById('syncStatusBadge') || 
-                       document.querySelector('.badge-sync') || 
-                       document.getElementById('storageMode');
+  const startSub = document.getElementById('startSub');
+  const pauseTitle = document.getElementById('pauseBtnTitle');
+  const pauseSub = document.getElementById('pauseBtnSub');
+  const pauseIcon = document.getElementById('pauseBtnIcon');
+  const storageBadge = document.getElementById('syncStatusBadge');
 
   const isCloud = typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser;
-
   if (storageBadge) {
     if (isCloud) {
       storageBadge.innerHTML = '☁️ Cloud (Synchronisé)';
@@ -210,126 +287,95 @@ function refreshPunchUI() {
 
   if (!st || st.status === 'stopped') {
     if (statusBadge) {
-      statusBadge.textContent = '• HORS SERVICE';
-      statusBadge.style.background = '';
+      statusBadge.textContent = '● HORS SERVICE';
+      statusBadge.className = 'status-pill';
     }
     if (btnStart) {
       btnStart.disabled = false;
-      btnStart.style.opacity = '1';
+      if (startSub) startSub.textContent = "Punch IN à l'heure exacte";
     }
     if (btnPause) {
       btnPause.disabled = true;
-      btnPause.style.opacity = '0.5';
-      btnPause.querySelector('.btn-title')?.replaceChildren('Prendre une pause');
+      btnPause.className = 'btn-hero btn-pause';
+      if (pauseTitle) pauseTitle.textContent = 'Prendre une pause';
+      if (pauseSub) pauseSub.textContent = 'Gèle le travail & cumule la pause';
+      if (pauseIcon) pauseIcon.textContent = '☕';
     }
-    if (btnFinish) {
-      btnFinish.disabled = true;
-      btnFinish.style.opacity = '0.5';
-    }
+    if (btnFinish) btnFinish.disabled = true;
   } else if (st.status === 'working') {
     if (statusBadge) {
-      statusBadge.textContent = '• EN SERVICE';
-      statusBadge.style.background = 'rgba(74, 222, 128, 0.2)';
+      statusBadge.textContent = '● EN SERVICE';
+      statusBadge.className = 'status-pill working';
     }
     if (btnStart) {
       btnStart.disabled = true;
-      btnStart.style.opacity = '0.5';
+      if (startSub) startSub.textContent = `Démarré à ${st.timeIn}`;
     }
     if (btnPause) {
       btnPause.disabled = false;
-      btnPause.style.opacity = '1';
-      const title = btnPause.querySelector('.btn-title');
-      if (title) title.textContent = 'Prendre une pause';
+      btnPause.className = 'btn-hero btn-pause';
+      if (pauseTitle) pauseTitle.textContent = 'Prendre une pause';
+      if (pauseSub) pauseSub.textContent = 'Gèle le travail & cumule la pause';
+      if (pauseIcon) pauseIcon.textContent = '☕';
     }
-    if (btnFinish) {
-      btnFinish.disabled = false;
-      btnFinish.style.opacity = '1';
-    }
+    if (btnFinish) btnFinish.disabled = false;
   } else if (st.status === 'paused') {
     if (statusBadge) {
-      statusBadge.textContent = '• EN PAUSE';
-      statusBadge.style.background = 'rgba(251, 191, 36, 0.2)';
+      statusBadge.textContent = '● EN PAUSE';
+      statusBadge.className = 'status-pill paused';
     }
     if (btnStart) {
       btnStart.disabled = true;
-      btnStart.style.opacity = '0.5';
+      if (startSub) startSub.textContent = `Démarré à ${st.timeIn}`;
     }
     if (btnPause) {
       btnPause.disabled = false;
-      btnPause.style.opacity = '1';
-      const title = btnPause.querySelector('.btn-title');
-      if (title) title.textContent = 'Reprendre le travail';
+      btnPause.className = 'btn-hero btn-resume';
+      if (pauseTitle) pauseTitle.textContent = 'Reprendre le travail';
+      if (pauseSub) pauseSub.textContent = 'Termine la pause & relance le chrono';
+      if (pauseIcon) pauseIcon.textContent = '▶';
     }
-    if (btnFinish) {
-      btnFinish.disabled = false;
-      btnFinish.style.opacity = '1';
-    }
+    if (btnFinish) btnFinish.disabled = false;
   }
 
   updateTimerDisplay();
 }
 
 function startPunchTimer() {
-  stopPunchTimer();
+  if (punchInterval) clearInterval(punchInterval);
   punchInterval = setInterval(updateTimerDisplay, 1000);
 }
 
-function stopPunchTimer() {
-  if (punchInterval) {
-    clearInterval(punchInterval);
-    punchInterval = null;
-  }
-}
-
-// ---------------------------------------------------------
-// WIDGETS DU TABLEAU DE BORD (PRÉVU & BANQUE)
-// ---------------------------------------------------------
-
 function updatePunchWidgets() {
-  const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
   const bankDisplay = document.getElementById('punchBankDisplay');
-
-  // Calcul du solde cumulé de la banque d'heures
-  let totalBalanceSec = 0;
-  logs.forEach(log => {
-    const net = log.actualNetSeconds ?? log.workedSec ?? 0;
-    // Base standard de 8h (28800s) par quart
-    const expected = 8 * 3600;
-    totalBalanceSec += (net - expected);
-  });
+  const totalBalanceSec = typeof calculateGlobalBankSeconds === 'function' ? calculateGlobalBankSeconds() : 0;
 
   if (bankDisplay) {
     const isPos = totalBalanceSec >= 0;
-    const absSec = Math.abs(totalBalanceSec);
-    const hrs = Math.floor(absSec / 3600);
-    const mins = Math.floor((absSec % 3600) / 60);
+    const absMin = Math.round(Math.abs(totalBalanceSec) / 60);
+    const hrs = Math.floor(absMin / 60);
+    const mins = absMin % 60;
     const sign = isPos ? '+' : '-';
 
     bankDisplay.textContent = `${sign}${hrs}h ${padZero(mins)}m`;
-    bankDisplay.style.color = isPos ? '#4ade80' : '#f87171';
+    bankDisplay.className = `widget-val-main ${isPos ? 'pos' : 'neg'}`;
   }
 }
 
 function initPunchEngine() {
-  const st = getPunch();
-  if (st && (st.status === 'working' || st.status === 'paused')) {
-    startPunchTimer();
-  }
+  startPunchTimer();
   refreshPunchUI();
   updatePunchWidgets();
-
-  // Écouteurs de boutons
-  document.getElementById('btnStartDay')?.addEventListener('click', startWorkDay);
-  document.getElementById('btnTogglePause')?.addEventListener('click', togglePause);
-  document.getElementById('btnFinishDay')?.addEventListener('click', finishWorkDay);
+  // Note : Aucun addEventListener redondant ici car les boutons utilisent onclick dans index.html
 }
 
-// Exposer globalement
 window.initPunchEngine = initPunchEngine;
 window.refreshPunchUI = refreshPunchUI;
 window.updatePunchWidgets = updatePunchWidgets;
+window.updateTimerDisplay = updateTimerDisplay;
 window.startWorkDay = startWorkDay;
 window.togglePause = togglePause;
+window.toggleWorkPause = togglePause;
 window.finishWorkDay = finishWorkDay;
 window.getPunch = getPunch;
 window.setPunch = setPunch;

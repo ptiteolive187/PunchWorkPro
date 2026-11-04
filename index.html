@@ -178,7 +178,7 @@
           <span id="manualFormHeader">Ajout manuel de quart</span>
           <div style="display: flex; gap: 6px;">
             <button type="button" class="badge-btn" onclick="resetManualToDefaults()">⚡ Horaires par défaut</button>
-            <button type="button" class="badge-btn" id="cancelEditBtn" style="display: none;" onclick="resetManualToDefaults()">Annuler</button>
+            <button type="button" class="badge-btn" id="cancelEditBtn" style="display: none;" onclick="cancelEditMode()">Annuler</button>
           </div>
         </div>
         <form id="manualEntryForm" onsubmit="handleManualSubmit(event); return false;">

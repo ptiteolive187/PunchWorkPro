@@ -1,13 +1,8 @@
-// ==========================================
-// js/results.js - Rendu & Gestion des Résultats
-// ==========================================
+// =========================================================
+// RENDU & GESTION DES RÉSULTATS (RESULTS.JS)
+// =========================================================
 
-// État initial du verrou de sécurité
 let isLocked = localStorage.getItem('safety_lock') !== 'false';
-
-// ==========================================
-// UTILITAIRES DE CONVERSION DE TEMPS
-// ==========================================
 
 function parsePauseToSec(str) {
   if (!str) return 1800;
@@ -28,31 +23,44 @@ function formatPauseTime(sec) {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
+// Calcul du lundi de la semaine en heure locale stricte (sans décalage UTC le soir)
 function getMonday(dStr) {
   if (!dStr) return '';
-  const p = dStr.split('-');
+  const p = dStr.split('-').map(Number);
   const d = new Date(p[0], p[1] - 1, p[2]);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff)).toISOString().split('T')[0];
+  d.setDate(diff);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dayNum = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dayNum}`;
 }
 
 function getDayNameFr(dateStr) {
   if (!dateStr) return '';
-  const parts = dateStr.split('-');
+  const parts = dateStr.split('-').map(Number);
   const d = new Date(parts[0], parts[1] - 1, parts[2]);
   const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   return dayNames[d.getDay()];
 }
 
 function getPrescribedDaySeconds(dateStr) {
-  let inStr = (window.config && window.config.defaultIn) ? window.config.defaultIn : "08:30";
-  let outStr = (window.config && window.config.defaultOut) ? window.config.defaultOut : "17:00";
-  let pauseStr = (window.config && window.config.defaultPause) ? window.config.defaultPause : "30m";
+  const cfg = window.config || {};
+  let inStr = cfg.defaultIn || "08:30";
+  let outStr = cfg.defaultOut || "17:00";
+  const pauseStr = cfg.defaultPause || "30m";
 
   if (window.agendrixSchedule && window.agendrixSchedule[dateStr]) {
     inStr = window.agendrixSchedule[dateStr].in;
     outStr = window.agendrixSchedule[dateStr].out;
+  } else if (typeof loadAgendrixCache === 'function') {
+    const cache = loadAgendrixCache();
+    const match = (cache || []).find(s => s.date === dateStr);
+    if (match) {
+      inStr = match.start;
+      outStr = match.end;
+    }
   }
 
   const [h1, m1] = inStr.split(':').map(Number);
@@ -62,14 +70,50 @@ function getPrescribedDaySeconds(dateStr) {
   return Math.max(0, span - parsePauseToSec(pauseStr));
 }
 
-// ==========================================
-// CALCUL & AFFICHAGE DE L'HISTORIQUE (RENDER)
-// ==========================================
+// Calcul global de la banque (partagé entre Résultats et le widget Pointages)
+function calculateGlobalBankSeconds() {
+  const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
+  if (!logs || logs.length === 0) return 0;
+
+  const weeks = {};
+  logs.forEach(l => {
+    if (!l.date) return;
+    const m = getMonday(l.date);
+    if (!weeks[m]) weeks[m] = [];
+    weeks[m].push(l);
+  });
+
+  let totalBankSec = 0;
+  Object.keys(weeks).forEach(monday => {
+    let weekWork = 0;
+    let weekTarget = 0;
+    const daysCounted = new Set();
+
+    weeks[monday].forEach(l => {
+      weekWork += (l.actualNetSeconds ?? l.workedSec ?? 0);
+      if (!daysCounted.has(l.date)) {
+        weekTarget += getPrescribedDaySeconds(l.date);
+        daysCounted.add(l.date);
+      }
+    });
+
+    totalBankSec += (weekWork - weekTarget);
+  });
+
+  return totalBankSec;
+}
+window.calculateGlobalBankSeconds = calculateGlobalBankSeconds;
 
 function render() {
   const logsContainer = document.getElementById('logs');
   const resB = document.getElementById('resBankDisplay');
   const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
+
+  // Synchroniser l'affichage de l'état du cadenas au rendu
+  const lockIcon = document.getElementById('lockIcon');
+  const lockText = document.getElementById('lockText');
+  if (lockIcon) lockIcon.textContent = isLocked ? '🔒' : '🔓';
+  if (lockText) lockText.textContent = isLocked ? 'Verrouillé' : 'Déverrouillé';
 
   if (logsContainer) logsContainer.innerHTML = '';
 
@@ -81,10 +125,10 @@ function render() {
       resB.className = 'bank-val pos';
       resB.textContent = '+0h 00m';
     }
+    if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
     return;
   }
 
-  // Regroupement par semaine du lundi
   const weeks = {};
   logs.forEach(l => {
     if (!l.date) return;
@@ -115,24 +159,21 @@ function render() {
     totalBankSec += delta;
 
     if (logsContainer) {
-      // Titre de la semaine
       const weekHeader = document.createElement('div');
       weekHeader.className = 'results-week-title';
       weekHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 4px 10px; margin-top: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);';
 
-      // Formatage de la date du lundi
       const [my, mm, md] = monday.split('-').map(Number);
       const monthsFull = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
       const monthName = monthsFull[mm - 1] || '';
 
-      // Calculs décimaux de la semaine
       const wHours = (weekWork / 3600).toFixed(2);
       const targetHours = (weekTarget / 3600).toFixed(2);
       const dHours = (delta >= 0 ? '+' : '-') + (Math.abs(delta) / 3600).toFixed(2);
       const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
 
       weekHeader.innerHTML = `
-        <div style="font-weight: 800; font-size: 0.95rem; color: #ffffff; line-height: 1.25;">
+        <div style="font-weight: 800; font-size: 0.95rem; color: var(--text); line-height: 1.25;">
           Semaine Du Lundi ${md}<br>${monthName}
         </div>
         <div style="text-align: right; line-height: 1.3;">
@@ -147,7 +188,6 @@ function render() {
 
       logsContainer.appendChild(weekHeader);
 
-      // Tri des jours de la semaine du plus récent au plus ancien
       weeks[monday].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
       weeks[monday].forEach(l => {
@@ -160,13 +200,11 @@ function render() {
           card.style.cursor = 'pointer';
           card.onclick = (e) => {
             if (e.target.closest('.btn-card-action')) return;
-            if (typeof editLog === 'function') editLog(l.id);
+            editLog(l.id);
           };
         }
 
         const dayName = getDayNameFr(l.date);
-
-        // Date abrégée : "30 Oct."
         const [y, m, d] = (l.date || '').split('-').map(Number);
         const monthsShort = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
         const dateShortStr = `${d} ${monthsShort[m - 1] || ''}`;
@@ -175,7 +213,6 @@ function render() {
         const targetSec = getPrescribedDaySeconds(l.date);
         const diffSec = netSec - targetSec;
 
-        // Calcul du solde affiché en texte simple (+0h 07m / -0h 15m)
         const diffMin = Math.round(diffSec / 60);
         const absM = Math.abs(diffMin);
         const bH = Math.floor(absM / 60);
@@ -188,7 +225,6 @@ function render() {
         const displayOut = l.out || l.timeOut || '--:--';
 
         card.innerHTML = `
-          <!-- Bloc de Gauche -->
           <div style="display: flex; flex-direction: column; gap: 3px;">
             <div style="font-weight: 800; font-size: 1.05rem; color: #ffffff;">${dayName}</div>
             <div style="font-size: 0.80rem; color: #7f93aa; font-weight: 500;">
@@ -199,7 +235,6 @@ function render() {
             </div>
           </div>
 
-          <!-- Bloc de Droite (Heures, Cible, Solde) -->
           <div style="display: flex; align-items: center; gap: 10px;">
             <div style="text-align: right; display: flex; flex-direction: column; gap: 3px;">
               <div style="font-weight: 800; font-size: 0.98rem; color: #38bdf8; letter-spacing: -0.01em;">
@@ -215,8 +250,8 @@ function render() {
 
             ${!isLocked ? `
               <div style="display: flex; flex-direction: column; gap: 4px; margin-left: 4px;">
-                <button class="btn-card-action" style="color: var(--blue);" onclick="editLog(${l.id})">✏️</button>
-                <button class="btn-card-action" style="color: var(--red);" onclick="delLog(${l.id})">✕</button>
+                <button type="button" class="btn-card-action" style="color: var(--blue);" onclick="editLog(${l.id})">✏️</button>
+                <button type="button" class="btn-card-action" style="color: var(--red);" onclick="delLog(${l.id})">✕</button>
               </div>
             ` : ''}
           </div>
@@ -227,14 +262,14 @@ function render() {
     }
   });
 
-  // Calcul du solde cumulé global en haut
-  const bH = Math.floor(Math.abs(totalBankSec) / 3600);
-  const bM = Math.floor((Math.abs(totalBankSec) % 3600) / 60);
+  const absTotalMin = Math.round(Math.abs(totalBankSec) / 60);
+  const bH = Math.floor(absTotalMin / 60);
+  const bM = absTotalMin % 60;
   const sign = totalBankSec >= 0 ? '+' : '-';
 
   if (resB) {
     resB.className = `bank-val ${totalBankSec >= 0 ? 'pos' : 'neg'}`;
-    resB.textContent = `${sign}${bH}h ${bM.toString().padStart(2, '0')}m`;
+    resB.textContent = `${sign}${bH}h ${String(bM).padStart(2, '0')}m`;
   }
 
   if (typeof updatePunchWidgets === 'function') {
@@ -242,23 +277,11 @@ function render() {
   }
 }
 
-// ==========================================
-// VERROUILLAGE / DÉVERROUILLAGE
-// ==========================================
-
 function toggleSafetyLock() {
   isLocked = !isLocked;
   localStorage.setItem('safety_lock', isLocked);
-  const lockIcon = document.getElementById('lockIcon');
-  const lockText = document.getElementById('lockText');
-  if (lockIcon) lockIcon.textContent = isLocked ? '🔒' : '🔓';
-  if (lockText) lockText.textContent = isLocked ? 'Verrouillé' : 'Déverrouillé';
   render();
 }
-
-// ==========================================
-// ÉDITION & SUPPRESSION DES QUARTS
-// ==========================================
 
 function editLog(id) {
   if (isLocked) return;
@@ -294,6 +317,25 @@ function editLog(id) {
   if (manSection) manSection.scrollIntoView({ behavior: 'smooth' });
 }
 
+function cancelEditMode() {
+  const editId = document.getElementById('editId');
+  const manHeader = document.getElementById('manualFormHeader');
+  const submitBtn = document.getElementById('btnSubmitShift');
+  const cancelBtn = document.getElementById('cancelEditBtn');
+
+  if (editId) editId.value = '';
+  if (manHeader) manHeader.textContent = "Ajout manuel de quart";
+  if (submitBtn) {
+    submitBtn.textContent = "Ajouter un nouveau quart";
+    submitBtn.className = "btn-action-main";
+  }
+  if (cancelBtn) cancelBtn.style.display = "none";
+
+  if (typeof resetManualToDefaults === 'function') {
+    resetManualToDefaults();
+  }
+}
+
 function delLog(id) {
   if (isLocked) return;
   if (!confirm('Supprimer ce quart de travail ?')) return;
@@ -302,18 +344,13 @@ function delLog(id) {
   logs = logs.filter(x => Number(x.id) !== Number(id));
   localStorage.setItem('shift_tracker_logs', JSON.stringify(logs));
 
-  // Suppression Cloud Firestore si l'utilisateur est connecté
   if (typeof window.deleteShiftFromCloud === 'function') {
     window.deleteShiftFromCloud(id);
   }
 
-  if (typeof cancelEditMode === 'function') cancelEditMode();
+  cancelEditMode();
   render();
 }
-
-// ==========================================
-// IMPORTATION CSV (Précision Seconde & Centésimal)
-// ==========================================
 
 function importCSV(event) {
   const file = event.target.files[0];
@@ -345,7 +382,6 @@ function importCSV(event) {
       if (idxPause === -1) idxPause = 3;
 
       let logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
-
       const replaceAll = confirm("Voulez-vous remplacer TOUT l'historique actuel par celui du fichier CSV ?\n\nOK = Remplacement complet (recommandé)\nAnnuler = Fusionner les quarts");
 
       if (replaceAll) {
@@ -376,7 +412,7 @@ function importCSV(event) {
           const existingIndex = logs.findIndex(l => l.date === shiftDate);
 
           const shiftObj = {
-            id: Date.now() + i,
+            id: existingIndex !== -1 ? logs[existingIndex].id : (Date.now() + i),
             date: shiftDate,
             in: shiftIn,
             timeIn: shiftIn,
@@ -385,7 +421,8 @@ function importCSV(event) {
             pauseSeconds: pauseSec,
             totalPause: pauseSec,
             actualNetSeconds: netSec,
-            workedSec: netSec
+            workedSec: netSec,
+            source: 'csv'
           };
 
           if (existingIndex !== -1) {
@@ -396,7 +433,6 @@ function importCSV(event) {
             importedCount++;
           }
 
-          // Envoi au Cloud si connecté
           if (typeof window.saveShiftToCloud === 'function') {
             window.saveShiftToCloud(shiftObj);
           }
@@ -407,10 +443,8 @@ function importCSV(event) {
       localStorage.setItem('shift_tracker_logs', JSON.stringify(logs));
 
       render();
-
       alert(`Importation réussie !\n${importedCount} quart(s) ajouté(s)\n${updatedCount} quart(s) mis à jour\n\nSolde exact recalculé.`);
       event.target.value = '';
-
     } catch (err) {
       alert("Erreur lors de l'importation : " + err.message);
     }
@@ -418,10 +452,6 @@ function importCSV(event) {
 
   reader.readAsText(file);
 }
-
-// ==========================================
-// EXPORTATION CSV
-// ==========================================
 
 function exportCSV() {
   const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
@@ -442,20 +472,17 @@ function exportCSV() {
   const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `heures_travaillees_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `heures_travaillees_${getTodayIsoDate()}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
 
-// ==========================================
-// EXPOSITION GLOBALE (Pour index.html & app.js)
-// ==========================================
-
 window.render = render;
 window.renderResults = render;
 window.toggleSafetyLock = toggleSafetyLock;
 window.editLog = editLog;
+window.cancelEditMode = cancelEditMode;
 window.delLog = delLog;
 window.importCSV = importCSV;
 window.exportCSV = exportCSV;

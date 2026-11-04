@@ -2,25 +2,24 @@
 // SERVICE WORKER - PUNCH WORK PRO (SW.JS)
 // ==========================================
 
-const CACHE_NAME = 'punchworkpro-cache-v1.0.1';
+const CACHE_NAME = 'punchworkpro-cache-v2.0.0';
 
-// Fichiers statiques vitaux à pré-charger pour le mode hors-ligne
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './style.css',
   './manifest.json',
   './icon-512.png',
   './js/storage.js',
-  './js/punch.js',
+  './js/agendrix.js',
   './js/results.js',
+  './js/punch.js',
   './js/app.js'
 ];
 
-// 1. Installation : mise en cache des assets statiques locaux
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Pré-mise en cache sans bloquer si un fichier secondaire manque
       return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
         console.warn('Avertissement pré-cache SW :', err);
       });
@@ -29,7 +28,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 2. Activation : purge des anciennes versions du cache
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -44,21 +42,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Récupération (Fetch) : Network-First avec repli Cache local
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  if (req.method !== 'GET') return;
 
-  // On ignore ce qui n'est pas du GET pur (POST, PUT, DELETE interdits dans le Cache API)
-  if (req.method !== 'GET') {
-    return;
-  }
-
-  // On ne met pas en cache les requêtes Firebase / Google Auth (gérées par le SDK Firestore)
   const url = new URL(req.url);
   if (
     url.hostname.includes('firebase') ||
     url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('google.com')
+    url.hostname.includes('google.com') ||
+    url.hostname.includes('allorigins.win') ||
+    url.hostname.includes('agendrix.com')
   ) {
     return;
   }
@@ -66,7 +60,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(req)
       .then((networkResponse) => {
-        // Si la réponse est valide, on met à jour la copie locale dans le cache
         if (networkResponse && networkResponse.status === 200) {
           const resClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -76,13 +69,9 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(async () => {
-        // En cas de panne réseau ou hors-ligne, on sert la copie en cache
         const cachedResponse = await caches.match(req);
-        if (cachedResponse) {
-          return cachedResponse;
-        }
+        if (cachedResponse) return cachedResponse;
 
-        // Si la ressource demandée était une navigation HTML, renvoyer la racine
         if (req.mode === 'navigate') {
           return caches.match('./') || caches.match('./index.html');
         }
