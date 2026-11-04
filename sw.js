@@ -2,7 +2,7 @@
 // SERVICE WORKER - PUNCH WORK PRO (SW.JS)
 // ==========================================
 
-const CACHE_NAME = 'punchworkpro-cache-v1';
+const CACHE_NAME = 'punchworkpro-cache-v1.0.1';
 
 // Fichiers statiques vitaux à pré-charger pour le mode hors-ligne
 const ASSETS_TO_CACHE = [
