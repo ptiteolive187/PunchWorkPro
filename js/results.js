@@ -207,7 +207,7 @@ function render() {
         const netSec = (l.actualNetSeconds ?? l.workedSec ?? 0);
         const card = document.createElement('div');
         card.className = 'result-card';
-        card.style.cssText = 'background: #0d131f; border: 1px solid #1c2738; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;';
+        card.style.cssText = 'background: var(--res-card-bg); border: 1px solid var(--res-card-border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;';
 
         if (!isLocked) {
           card.style.cursor = 'pointer';
@@ -239,21 +239,21 @@ function render() {
 
         card.innerHTML = `
           <div style="display: flex; flex-direction: column; gap: 3px;">
-            <div style="font-weight: 800; font-size: 1.05rem; color: #ffffff;">${dayName}</div>
-            <div style="font-size: 0.80rem; color: #7f93aa; font-weight: 500;">
+            <div style="font-weight: 800; font-size: 1.05rem; color: var(--res-title);">${dayName}</div>
+            <div style="font-size: 0.80rem; color: var(--res-sub); font-weight: 500;">
               ${dateShortStr} &bull; ${displayIn} ➔ ${displayOut}
             </div>
-            <div style="font-size: 0.75rem; color: #7f93aa;">
+            <div style="font-size: 0.75rem; color: var(--res-sub);">
               Pause : ${pauseLabel}
             </div>
           </div>
 
           <div style="display: flex; align-items: center; gap: 10px;">
             <div style="text-align: right; display: flex; flex-direction: column; gap: 3px;">
-              <div style="font-weight: 800; font-size: 0.98rem; color: #38bdf8; letter-spacing: -0.01em;">
+              <div style="font-weight: 800; font-size: 0.98rem; color: var(--res-hours); letter-spacing: -0.01em;">
                 ${(netSec / 3600).toFixed(2)}h
               </div>
-              <div style="font-size: 0.78rem; color: #7f93aa; font-weight: 500;">
+              <div style="font-size: 0.78rem; color: var(--res-sub); font-weight: 500;">
                 Cible : ${(targetSec / 3600).toFixed(2)}h
               </div>
               <div style="font-weight: 800; font-size: 0.88rem; color: ${balanceColor};">

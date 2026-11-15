@@ -775,3 +775,39 @@ select {
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* COULEURS DÉDIÉES AUX CARTES DE RÉSULTATS */
+:root {
+  /* Tes couleurs exactes en mode sombre (inchangées) */
+  --res-card-bg: #0d131f;
+  --res-card-border: #1c2738;
+  --res-title: #ffffff;
+  --res-sub: #7f93aa;
+  --res-hours: #38bdf8;
+}
+
+html[data-theme="light"],
+body[data-theme="light"],
+body.light-theme,
+body.light-mode,
+body.light {
+  /* Nouvelles couleurs ajoutées uniquement pour le mode clair */
+  --res-card-bg: #ffffff;
+  --res-card-border: #cfd8e3;
+  --res-title: #0f172a;
+  --res-sub: #52637a;
+  --res-hours: #0284c7;
+}
+
+/* CORRECTIF PLEINE HAUTEUR SUR IPHONE QUAND LES ACCORDÉONS SONT FERMÉS */
+html {
+  min-height: 100%;
+  background-color: var(--bg);
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  box-sizing: border-box;
+}
