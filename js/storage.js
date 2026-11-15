@@ -11,7 +11,7 @@ const DEFAULT_CONFIG = {
   defaultIn: '08:30',
   defaultOut: '17:00',
   defaultPause: '30m',
-  agendrixUrl: 'https://app.agendrix.com/api/calendar/74b512f9-f575-45b1-938a-2260e20c2c13.ics',
+  agendrixUrl: '',
   calPastShifts: 5,
   calFutureShifts: 15,
   maxVisibleLogs: 15,

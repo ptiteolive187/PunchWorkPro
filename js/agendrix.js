@@ -30,9 +30,11 @@ async function fetchAgendrixShifts() {
     let icsData = null;
     const encodedUrl = encodeURIComponent(targetUrl);
 
-    // Liste de proxys CORS avec bascule automatique si l'un est hors-ligne (503)
+ // Relais personnel Google Apps Script en priorité + proxys de secours corrigés
     const proxyList = [
-      `https://corsproxy.io/?url=${encodedUrl}`,
+      `https://script.google.com/macros/s/AKfycbzjmcrLvOEa_cHkZAuX1FnqNFriPg04J_ebeSSJsVE4nzYk1U6GK8Q4FyLbDxeXm0_fYA/exec?url=${encodedUrl}`,
+      `https://api.allorigins.win/raw?url=${encodedUrl}`,
+      `https://corsproxy.io/?${encodedUrl}`,
       `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`,
       `https://api.allorigins.win/get?url=${encodedUrl}`
     ];
