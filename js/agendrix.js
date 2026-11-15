@@ -262,6 +262,9 @@ function selectShiftFromCalendar(date, start, end) {
   if (typeof cancelEditMode === 'function') {
     cancelEditMode();
   }
+  if (typeof toggleManualForm === 'function') {
+    toggleManualForm(true);
+  }
 
   const cfg = window.config || {};
   const manDate = document.getElementById('manDate');
@@ -277,4 +280,5 @@ function selectShiftFromCalendar(date, start, end) {
   const manSection = document.getElementById('manualCardSection');
   if (manSection) manSection.scrollIntoView({ behavior: 'smooth' });
 }
+window.selectShiftFromCalendar = selectShiftFromCalendar;
 window.selectShiftFromCalendar = selectShiftFromCalendar;

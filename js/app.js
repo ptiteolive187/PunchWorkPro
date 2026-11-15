@@ -75,6 +75,22 @@ function switchTab(tabName, clickedBtn) {
 }
 window.switchTab = switchTab;
 
+// --- OUVERTURE / FERMETURE DU FORMULAIRE MANUEL ---
+function toggleManualForm(forceState) {
+  const secMan = document.getElementById('manualCardSection');
+  const iconEl = document.getElementById('toggleManualIcon');
+  const textEl = document.getElementById('toggleManualText');
+  if (!secMan) return;
+
+  const isCurrentlyHidden = secMan.style.display === 'none' || secMan.style.display === '';
+  const shouldOpen = typeof forceState === 'boolean' ? forceState : isCurrentlyHidden;
+
+  secMan.style.display = shouldOpen ? 'block' : 'none';
+  if (iconEl) iconEl.textContent = shouldOpen ? '➖' : '➕';
+  if (textEl) textEl.textContent = shouldOpen ? 'Masquer le formulaire' : 'Ajout / Modification de quart';
+}
+window.toggleManualForm = toggleManualForm;
+
 // --- GESTION DE LA VISIBILITÉ ---
 function updateVisibility() {
   const showSched = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
@@ -95,8 +111,12 @@ function updateVisibility() {
   const secHist = document.getElementById('historyCardSection');
   if (secHist) secHist.style.display = showHist ? 'block' : 'none';
 
+  const btnToggleMan = document.getElementById('btnToggleManualForm');
   const secMan = document.getElementById('manualCardSection');
-  if (secMan) secMan.style.display = showMan ? 'block' : 'none';
+  if (btnToggleMan) btnToggleMan.style.display = showMan ? 'flex' : 'none';
+  if (!showMan && secMan) {
+    secMan.style.display = 'none';
+  }
 
   if (typeof updateTimerDisplay === 'function') {
     updateTimerDisplay();
@@ -127,6 +147,9 @@ function populateConfigUI() {
   const futSh = document.getElementById('cfgCalFutureShifts');
   if (futSh) futSh.value = cfg.calFutureShifts ?? 15;
 
+  const maxLogs = document.getElementById('cfgMaxVisibleLogs');
+  if (maxLogs) maxLogs.value = cfg.maxVisibleLogs ?? 15;
+
   const cbSched = document.getElementById('cfgShowScheduleTab');
   if (cbSched) cbSched.checked = cfg.showScheduleTab ?? true;
 
@@ -154,6 +177,9 @@ function saveConfiguration() {
 
   const parsedFuture = parseInt(document.getElementById('cfgCalFutureShifts')?.value, 10);
   cfg.calFutureShifts = isNaN(parsedFuture) ? 15 : parsedFuture;
+
+  const parsedMaxLogs = parseInt(document.getElementById('cfgMaxVisibleLogs')?.value, 10);
+  cfg.maxVisibleLogs = isNaN(parsedMaxLogs) ? 15 : Math.max(0, parsedMaxLogs);
 
   cfg.showScheduleTab = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
   cfg.showHistory = document.getElementById('cfgShowHistory')?.checked ?? true;
@@ -277,7 +303,8 @@ function handleManualSubmit(e) {
   } else {
     resetManualToDefaults();
   }
-
+  toggleManualForm(false);
+  
   if (typeof render === 'function') render();
   if (typeof updatePunchWidgets === 'function') updatePunchWidgets();
   if (typeof refreshPunchUI === 'function') refreshPunchUI();

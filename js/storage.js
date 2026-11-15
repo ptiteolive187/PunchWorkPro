@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
   agendrixUrl: 'https://app.agendrix.com/api/calendar/74b512f9-f575-45b1-938a-2260e20c2c13.ics',
   calPastShifts: 5,
   calFutureShifts: 15,
+  maxVisibleLogs: 15,
   showScheduleTab: true,
   showHistory: true,
   showManual: true,

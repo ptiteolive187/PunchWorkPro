@@ -109,7 +109,6 @@ function render() {
   const resB = document.getElementById('resBankDisplay');
   const logs = JSON.parse(localStorage.getItem('shift_tracker_logs') || '[]');
 
-  // Synchroniser l'affichage de l'état du cadenas au rendu
   const lockIcon = document.getElementById('lockIcon');
   const lockText = document.getElementById('lockText');
   if (lockIcon) lockIcon.textContent = isLocked ? '🔒' : '🔓';
@@ -140,10 +139,17 @@ function render() {
   const sortedMondays = Object.keys(weeks).sort((a, b) => b.localeCompare(a));
   let totalBankSec = 0;
 
+  // Limite d'affichage configurée (0 = illimité)
+  const maxVisible = Number(window.config?.maxVisibleLogs ?? 15);
+  let renderedCount = 0;
+
   sortedMondays.forEach(monday => {
     let weekWork = 0;
     let weekTarget = 0;
     const daysCounted = new Set();
+
+    // Tri des quarts de la semaine du plus récent au plus ancien
+    weeks[monday].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     weeks[monday].forEach(l => {
       const worked = (l.actualNetSeconds ?? l.workedSec ?? 0);
@@ -158,7 +164,16 @@ function render() {
     const delta = weekWork - weekTarget;
     totalBankSec += delta;
 
-    if (logsContainer) {
+    // Déterminer quels quarts de cette semaine doivent être affichés selon la limite
+    const visibleWeekLogs = [];
+    weeks[monday].forEach(l => {
+      if (maxVisible <= 0 || renderedCount < maxVisible) {
+        visibleWeekLogs.push(l);
+        renderedCount++;
+      }
+    });
+
+    if (logsContainer && visibleWeekLogs.length > 0) {
       const weekHeader = document.createElement('div');
       weekHeader.className = 'results-week-title';
       weekHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 4px 10px; margin-top: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);';
@@ -188,9 +203,7 @@ function render() {
 
       logsContainer.appendChild(weekHeader);
 
-      weeks[monday].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-
-      weeks[monday].forEach(l => {
+      visibleWeekLogs.forEach(l => {
         const netSec = (l.actualNetSeconds ?? l.workedSec ?? 0);
         const card = document.createElement('div');
         card.className = 'result-card';
@@ -262,6 +275,13 @@ function render() {
     }
   });
 
+  if (logsContainer && maxVisible > 0 && logs.length > maxVisible) {
+    const infoNote = document.createElement('div');
+    infoNote.style.cssText = 'text-align: center; color: var(--muted); font-size: 0.76rem; padding: 8px 0 4px;';
+    infoNote.textContent = `Affichage des ${maxVisible} quarts les plus récents sur ${logs.length} enregistrés.`;
+    logsContainer.appendChild(infoNote);
+  }
+
   const absTotalMin = Math.round(Math.abs(totalBankSec) / 60);
   const bH = Math.floor(absTotalMin / 60);
   const bM = absTotalMin % 60;
@@ -289,8 +309,12 @@ function editLog(id) {
   const l = logs.find(x => Number(x.id) === Number(id));
   if (!l) return;
 
-  const manSection = document.getElementById('manualCardSection');
-  if (manSection) manSection.style.display = 'block';
+  if (typeof toggleManualForm === 'function') {
+    toggleManualForm(true);
+  } else {
+    const manSection = document.getElementById('manualCardSection');
+    if (manSection) manSection.style.display = 'block';
+  }
 
   const editId = document.getElementById('editId');
   const manDate = document.getElementById('manDate');
@@ -314,6 +338,7 @@ function editLog(id) {
   }
   if (cancelBtn) cancelBtn.style.display = "inline-block";
 
+  const manSection = document.getElementById('manualCardSection');
   if (manSection) manSection.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -333,6 +358,9 @@ function cancelEditMode() {
 
   if (typeof resetManualToDefaults === 'function') {
     resetManualToDefaults();
+  }
+  if (typeof toggleManualForm === 'function') {
+    toggleManualForm(false);
   }
 }
 

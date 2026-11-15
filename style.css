@@ -692,3 +692,32 @@ input:checked + .slider:before {
   color: var(--text);
   font-weight: 700;
 }
+
+/* SECTION DÉROULANTE (ACCORDÉON CONFIG) */
+.accordion-card {
+  padding: 0;
+  overflow: hidden;
+}
+.accordion-summary {
+  padding: 16px;
+  margin-bottom: 0;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.accordion-summary::-webkit-details-marker {
+  display: none;
+}
+.accordion-arrow {
+  transition: transform 0.25s ease;
+  font-size: 0.75rem;
+}
+details.accordion-card[open] .accordion-arrow {
+  transform: rotate(180deg);
+}
+details.accordion-card[open] .accordion-summary {
+  border-bottom: 1px solid var(--border);
+}
+.accordion-body {
+  padding: 16px;
+}
