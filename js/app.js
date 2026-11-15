@@ -94,12 +94,14 @@ window.toggleManualForm = toggleManualForm;
 // --- GESTION DE LA VISIBILITÉ ---
 function updateVisibility() {
   const showSched = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
+  const showRes = document.getElementById('cfgShowResultsTab')?.checked ?? true;
   const showHist = document.getElementById('cfgShowHistory')?.checked ?? true;
   const showMan = document.getElementById('cfgShowManual')?.checked ?? true;
   const showRem = document.getElementById('cfgShowDayRemaining')?.checked ?? true;
 
   if (window.config) {
     window.config.showScheduleTab = showSched;
+    window.config.showResultsTab = showRes;
     window.config.showHistory = showHist;
     window.config.showManual = showMan;
     window.config.showDayRemaining = showRem;
@@ -107,6 +109,9 @@ function updateVisibility() {
 
   const navSched = document.getElementById('navBtn-schedule');
   if (navSched) navSched.style.display = showSched ? 'flex' : 'none';
+
+  const navRes = document.getElementById('navBtn-results');
+  if (navRes) navRes.style.display = showRes ? 'flex' : 'none';
 
   const secHist = document.getElementById('historyCardSection');
   if (secHist) secHist.style.display = showHist ? 'block' : 'none';
@@ -153,6 +158,9 @@ function populateConfigUI() {
   const cbSched = document.getElementById('cfgShowScheduleTab');
   if (cbSched) cbSched.checked = cfg.showScheduleTab ?? true;
 
+  const cbRes = document.getElementById('cfgShowResultsTab');
+if (cbRes) cbRes.checked = cfg.showResultsTab ?? true;
+
   const cbHist = document.getElementById('cfgShowHistory');
   if (cbHist) cbHist.checked = cfg.showHistory ?? true;
 
@@ -182,6 +190,7 @@ function saveConfiguration() {
   cfg.maxVisibleLogs = isNaN(parsedMaxLogs) ? 15 : Math.max(0, parsedMaxLogs);
 
   cfg.showScheduleTab = document.getElementById('cfgShowScheduleTab')?.checked ?? true;
+  cfg.showResultsTab = document.getElementById('cfgShowResultsTab')?.checked ?? true;
   cfg.showHistory = document.getElementById('cfgShowHistory')?.checked ?? true;
   cfg.showManual = document.getElementById('cfgShowManual')?.checked ?? true;
   cfg.showDayRemaining = document.getElementById('cfgShowDayRemaining')?.checked ?? true;
@@ -203,9 +212,15 @@ function saveConfiguration() {
   if (typeof render === 'function') render();
   if (typeof refreshPunchUI === 'function') refreshPunchUI();
 
-  alert('Configuration enregistrée avec succès !');
+  // alert('Configuration enregistrée avec succès !'); 
 }
 window.saveConfiguration = saveConfiguration;
+
+// Sauvegarde automatique dès qu'un réglage est modifié dans l'onglet Configuration
+document.getElementById('tab-config')?.addEventListener('change', (e) => {
+  if (e.target.id === 'icsFileInput' || e.target.id === 'csvFileInput') return;
+  saveConfiguration();
+});
 
 // --- RÉINITIALISATION DU FORMULAIRE MANUEL ---
 function resetManualToDefaults() {

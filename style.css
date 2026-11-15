@@ -693,7 +693,7 @@ input:checked + .slider:before {
   font-weight: 700;
 }
 
-/* SECTION DÉROULANTE (ACCORDÉON CONFIG) */
+/* SECTION DÉROULANTE (ACCORDÉON CONFIG & SOUS-ACCORDÉON) */
 .accordion-card {
   padding: 0;
   overflow: hidden;
@@ -705,21 +705,56 @@ input:checked + .slider:before {
   list-style: none;
   user-select: none;
 }
-.accordion-summary::-webkit-details-marker {
+.accordion-summary::-webkit-details-marker,
+.nested-accordion-summary::-webkit-details-marker {
   display: none;
 }
 .accordion-arrow {
   transition: transform 0.25s ease;
   font-size: 0.75rem;
 }
-details.accordion-card[open] .accordion-arrow {
+details[open] > summary .accordion-arrow {
   transform: rotate(180deg);
 }
-details.accordion-card[open] .accordion-summary {
+details.accordion-card[open] > .accordion-summary {
   border-bottom: 1px solid var(--border);
 }
 .accordion-body {
   padding: 16px;
+}
+
+/* Sous-accordéon imbriqué */
+.nested-accordion {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+.nested-accordion-summary {
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+details.nested-accordion[open] > .nested-accordion-summary {
+  border-bottom: 1px solid var(--border);
+}
+.nested-accordion-body {
+  padding: 12px 14px;
+}
+.config-subgroup-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--blue);
+  margin-bottom: 8px;
 }
 
 /* CORRECTIF SAFARI iOS POUR LES GRILLES ET CHAMPS DATE/HEURE */

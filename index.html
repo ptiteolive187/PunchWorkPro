@@ -26,7 +26,7 @@
     }
   </script>
 
-  <!-- SDKs Firebase Compat -->
+  <!-- SDKs Firebase Compatibilité -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -209,11 +209,115 @@
     <!-- ======================================= -->
     <!-- ======= ONGLET 4 : CONFIGURATION ====== -->
     <!-- ======================================= -->
+<!-- ONGLET 4 : CONFIGURATION -->
     <section id="tab-config" class="tab-content">
 
-      <!-- Compte Google & Synchronisation Cloud -->
+      <!-- SECTION 1 : AFFICHAGE -->
+      <details class="card accordion-card">
+        <summary class="card-title accordion-summary">
+          <span>🎨 Affichage</span>
+          <span class="accordion-arrow">▼</span>
+        </summary>
+        
+        <div class="accordion-body">
+          <!-- Sous-section : Apparence et thème -->
+          <div style="margin-bottom: 14px;">
+            <div class="config-subgroup-title">Apparence et thème</div>
+            <label for="cfgTheme">Thème visuel</label>
+            <select id="cfgTheme" onchange="changeTheme(this.value)">
+              <option value="system">⚙️ Système (Automatique)</option>
+              <option value="dark">🌙 Sombre</option>
+              <option value="light">☀️ Clair</option>
+            </select>
+            <small style="color: var(--muted); font-size: 0.72rem; display: block; margin-top: 6px;">
+              Le mode Système s'ajuste immédiatement lorsque votre appareil bascule entre jour et nuit.
+            </small>
+          </div>
+
+          <!-- Sous-section : Affichage des onglets et sections visibles -->
+          <details class="nested-accordion">
+            <summary class="nested-accordion-summary">
+              <span>Affichage des onglets et sections visibles</span>
+              <span class="accordion-arrow">▼</span>
+            </summary>
+
+            <div class="nested-accordion-body">
+              <!-- Groupe 1 : Onglets visibles -->
+              <div class="config-subgroup-title">Onglets visibles</div>
+
+              <div class="switch-row">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.9rem;">Onglet Horaire Agendrix</div>
+                  <div style="font-size: 0.72rem; color: var(--muted);">Afficher l'onglet Horaire dans la barre du bas</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cfgShowScheduleTab" checked onchange="updateVisibility()">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="switch-row">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.9rem;">Onglet Résultats</div>
+                  <div style="font-size: 0.72rem; color: var(--muted);">Afficher l'onglet Résultats dans la barre du bas</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cfgShowResultsTab" checked onchange="updateVisibility()">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <!-- Groupe 2 : Sections d'onglets visibles -->
+              <div class="config-subgroup-title" style="margin-top: 14px;">Sections d'onglets visibles</div>
+
+              <div class="switch-row">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.9rem;">Bandeau temps restant du jour</div>
+                  <div style="font-size: 0.72rem; color: var(--muted);">Afficher le décompte et l'estimation de fin</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cfgShowDayRemaining" checked onchange="updateVisibility()">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="switch-row">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.9rem;">Historique détaillé</div>
+                  <div style="font-size: 0.72rem; color: var(--muted);">Afficher la liste des quarts dans Résultats</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cfgShowHistory" checked onchange="updateVisibility()">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="switch-row">
+                <div>
+                  <div style="font-weight: 700; font-size: 0.9rem;">Bouton d'ajout / modification de quart</div>
+                  <div style="font-size: 0.72rem; color: var(--muted);">Afficher le bouton de saisie manuelle dans Résultats</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cfgShowManual" checked onchange="updateVisibility()">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                <label for="cfgMaxVisibleLogs">Nombre de quarts visibles dans Résultats</label>
+                <input type="number" id="cfgMaxVisibleLogs" value="15" min="0" max="500">
+                <small style="color: var(--muted); font-size: 0.72rem; display: block; margin-top: 4px;">
+                  0 pour afficher tout l'historique (le solde de la banque tient toujours compte de tous les quarts).
+                </small>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <!-- SECTION 2 : COMPTE ET SYNCHRONISATION CLOUD -->
       <div class="card">
-        <div class="card-title">Compte & Synchronisation Cloud</div>
+        <div class="card-title">☁️ Compte et synchronisation cloud</div>
         <div id="authContainer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
           <button id="btnGoogleLogin" type="button" class="btn-action-main" style="margin-top: 0; background: #4285F4; color: white;">
             ☁️ Se connecter avec Google
@@ -230,102 +334,38 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Apparence & Thème</div>
-        <div>
-          <label for="cfgTheme">Thème visuel</label>
-          <select id="cfgTheme" onchange="changeTheme(this.value)">
-            <option value="system">⚙️ Système (Automatique)</option>
-            <option value="dark">🌙 Sombre</option>
-            <option value="light">☀️ Clair</option>
-          </select>
-        </div>
-        <small style="color: var(--muted); font-size: 0.72rem; display: block; margin-top: 6px;">
-          Le mode Système s'ajuste immédiatement lorsque votre appareil bascule entre jour et nuit.
-        </small>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Affichage des sections & Onglets</div>
-        
-        <div class="switch-row">
-          <div>
-            <div style="font-weight: 700; font-size: 0.9rem;">Onglet Horaire Agendrix</div>
-            <div style="font-size: 0.72rem; color: var(--muted);">Afficher l'onglet Horaire dans la barre du bas</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="cfgShowScheduleTab" checked onchange="updateVisibility()">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div>
-            <div style="font-weight: 700; font-size: 0.9rem;">Bandeau temps restant du jour</div>
-            <div style="font-size: 0.72rem; color: var(--muted);">Afficher le décompte et l'estimation de fin</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="cfgShowDayRemaining" checked onchange="updateVisibility()">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div>
-            <div style="font-weight: 700; font-size: 0.9rem;">Historique détaillé</div>
-            <div style="font-size: 0.72rem; color: var(--muted);">Afficher la liste des quarts dans Résultats</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="cfgShowHistory" checked onchange="updateVisibility()">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div>
-            <div style="font-weight: 700; font-size: 0.9rem;">Bouton d'ajout / modification de quart</div>
-            <div style="font-size: 0.72rem; color: var(--muted);">Afficher le bouton de saisie manuelle dans Résultats</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="cfgShowManual" checked onchange="updateVisibility()">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <label for="cfgMaxVisibleLogs">Nombre de quarts visibles dans Résultats</label>
-          <input type="number" id="cfgMaxVisibleLogs" value="15" min="0" max="500">
-          <small style="color: var(--muted); font-size: 0.72rem; display: block; margin-top: 4px;">
-            0 pour afficher tout l'historique (le solde de la banque tient toujours compte de tous les quarts).
-          </small>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Horaire prescrit habituel</div>
-        <div class="grid-2" style="margin-bottom: 12px;">
-          <div>
-            <label for="cfgDefaultIn">Arrivée habituelle</label>
-            <input type="time" id="cfgDefaultIn" value="08:30">
-          </div>
-          <div>
-            <label for="cfgDefaultOut">Départ habituel</label>
-            <input type="time" id="cfgDefaultOut" value="17:00">
-          </div>
-        </div>
-        <div>
-          <label for="cfgDefaultPause">Durée de pause standard</label>
-          <input type="text" id="cfgDefaultPause" value="30m">
-        </div>
-        <small style="color: var(--muted); font-size: 0.75rem; display: block; margin-top: 8px;">
-          La banque d'heures s'équilibre (0h 00m) exactement sur cet horaire net.
-        </small>
-      </div>
-
-      <!-- SECTION DÉROULANTE AGENDRIX -->
+      <!-- SECTION 3 : PARAMÈTRE D'HORAIRE PAR DÉFAUT -->
       <details class="card accordion-card">
         <summary class="card-title accordion-summary">
-          <span>📅 Configuration & Intégration Agendrix</span>
+          <span>⏰ Paramètre d'horaire par défaut</span>
+          <span class="accordion-arrow">▼</span>
+        </summary>
+        
+        <div class="accordion-body">
+          <div class="grid-2" style="margin-bottom: 12px;">
+            <div>
+              <label for="cfgDefaultIn">Heure d'arrivée</label>
+              <input type="time" id="cfgDefaultIn" value="08:30">
+            </div>
+            <div>
+              <label for="cfgDefaultOut">Heure de départ</label>
+              <input type="time" id="cfgDefaultOut" value="17:00">
+            </div>
+          </div>
+          <div>
+            <label for="cfgDefaultPause">Temps de pause</label>
+            <input type="text" id="cfgDefaultPause" value="30m">
+          </div>
+          <small style="color: var(--muted); font-size: 0.75rem; display: block; margin-top: 8px;">
+            La banque d'heures s'équilibre (0h 00m) exactement sur cet horaire net.
+          </small>
+        </div>
+      </details>
+
+      <!-- SECTION 4 : CONFIGURATION ET INTÉGRATION AGENDRIX -->
+      <details class="card accordion-card">
+        <summary class="card-title accordion-summary">
+          <span>📅 Configuration et intégration Agendrix</span>
           <span class="accordion-arrow">▼</span>
         </summary>
         
@@ -360,23 +400,29 @@
         </div>
       </details>
 
-      <div class="card">
-        <div class="card-title">Sauvegarde & Données</div>
-        <div style="display: flex; gap: 8px; flex-direction: column;">
-          <button type="button" class="btn-action-main" style="margin-top: 0; background: var(--action-btn-bg); color: var(--text);" onclick="exportCSV()">
-            📤 Exporter l'historique en CSV
-          </button>
-          <label class="btn-action-main" style="margin-top: 8px; background: var(--action-btn-bg); color: var(--text); text-align: center; cursor: pointer; display: block; position: relative; overflow: hidden; box-sizing: border-box;">
-            📥 Importer sauvegarde CSV
-            <input type="file" id="csvFileInput" onchange="importCSV(event)" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
-          </label>
+      <!-- SECTION 5 : IMPORTATION ET EXPORTATION -->
+      <details class="card accordion-card">
+        <summary class="card-title accordion-summary">
+          <span>🔄 Importation et exportation</span>
+          <span class="accordion-arrow">▼</span>
+        </summary>
+        
+        <div class="accordion-body">
+          <div style="display: flex; gap: 8px; flex-direction: column;">
+            <label class="btn-action-main" style="margin-top: 0; background: var(--action-btn-bg); color: var(--text); text-align: center; cursor: pointer; display: block; position: relative; overflow: hidden; box-sizing: border-box;">
+              📥 Importer sauvegarde CSV
+              <input type="file" id="csvFileInput" onchange="importCSV(event)" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
+            </label>
+            <button type="button" class="btn-action-main" style="margin-top: 8px; background: var(--action-btn-bg); color: var(--text);" onclick="exportCSV()">
+              📤 Exporter l'historique en CSV
+            </button>
+          </div>
+          <small style="color: var(--muted); font-size: 0.72rem; display: block; margin-top: 8px;">
+            Restaure, fusionne ou sauvegarde vos quarts de travail enregistrés via un fichier CSV.
+          </small>
         </div>
-        <small style="color: var(--muted); font-size: 0.72rem; display: block; margin-top: 8px;">
-          Restaure ou fusionne vos quarts de travail enregistrés depuis un fichier CSV.
-        </small>
-      </div>
+      </details>
 
-      <button type="button" class="btn-action-main" style="background: var(--green); color: #000;" onclick="saveConfiguration()">💾 Sauvegarder les paramètres</button>
     </section>
     
     

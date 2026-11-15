@@ -2,7 +2,7 @@
 // SERVICE WORKER - PUNCH WORK PRO (SW.JS)
 // ==========================================
 
-const CACHE_NAME = 'punchworkpro-cache-v2.0.3';
+const CACHE_NAME = 'punchworkpro-cache-v2.0.4';
 
 const ASSETS_TO_CACHE = [
   './',

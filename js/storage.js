@@ -16,6 +16,7 @@ const DEFAULT_CONFIG = {
   calFutureShifts: 15,
   maxVisibleLogs: 15,
   showScheduleTab: true,
+  showResultsTab: true,
   showHistory: true,
   showManual: true,
   showDayRemaining: true
