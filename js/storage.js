@@ -54,6 +54,9 @@ window.loadConfig = loadConfig;
 function saveConfig(cfg) {
   window.config = { ...DEFAULT_CONFIG, ...(cfg || window.config) };
   localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(window.config));
+  if (typeof saveConfigToCloud === 'function') {
+    saveConfigToCloud(window.config);
+  }
 }
 window.saveConfig = saveConfig;
 
@@ -159,6 +162,7 @@ if (auth) {
     updateAuthUI(user);
 
     if (user) {
+      await loadConfigFromCloud();
       await loadShiftsFromCloud();
     }
   });
@@ -256,6 +260,48 @@ async function deleteShiftFromCloud(shiftId) {
   }
 }
 window.deleteShiftFromCloud = deleteShiftFromCloud;
+
+async function saveConfigToCloud(cfgData) {
+  const user = (auth && auth.currentUser) || currentUser;
+  if (!user || !db || !cfgData) return;
+
+  try {
+    await db.collection('users').doc(user.uid).set({
+      config: cfgData,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.error("Erreur écriture config Firestore :", err);
+  }
+}
+window.saveConfigToCloud = saveConfigToCloud;
+
+async function loadConfigFromCloud() {
+  const user = (auth && auth.currentUser) || currentUser;
+  if (!user || !db) return;
+
+  try {
+    const doc = await db.collection('users').doc(user.uid).get();
+    if (doc.exists && doc.data() && doc.data().config) {
+      const cloudCfg = doc.data().config;
+      window.config = { ...DEFAULT_CONFIG, ...cloudCfg };
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(window.config));
+
+      if (typeof applyTheme === 'function') applyTheme(window.config.theme);
+      if (typeof populateConfigUI === 'function') populateConfigUI();
+      if (typeof updateVisibility === 'function') updateVisibility();
+      if (typeof resetManualToDefaults === 'function') resetManualToDefaults();
+      if (typeof render === 'function') render();
+      if (typeof refreshPunchUI === 'function') refreshPunchUI();
+    } else if (window.config) {
+      // Premier lancement : envoie la config locale actuelle vers le Cloud
+      await saveConfigToCloud(window.config);
+    }
+  } catch (err) {
+    console.error("Erreur lecture config Firestore :", err);
+  }
+}
+window.loadConfigFromCloud = loadConfigFromCloud;
 
 function bindAuthButtons() {
   const btnLogin = document.getElementById('btnGoogleLogin');
